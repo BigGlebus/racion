@@ -13,7 +13,7 @@
 <link rel="icon" href="icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
-<script>window.APP_VERSION = "23.11-95e8ab";</script>
+<script>window.APP_VERSION = "23.11-74ab77";</script>
 <title>Рацион дня</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -233,6 +233,26 @@ input, select { font: inherit; color: inherit; }
 .lrow .ld.more { color: var(--warn); }
 .lrow.dim { opacity: .45; }
 .lrow:active { background: var(--surface-2); }
+
+/* вкладка «Продукты» */
+.ph { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 14px; }
+.ph .page-h { padding: 0; }
+.addprod { display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px 9px 11px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-weight: 600; font-size: 14px; white-space: nowrap; }
+.addprod svg { width: 16px; height: 16px; }
+#app > .page-sub { margin-top: 6px; }
+.pchips { margin: 0 0 12px; }
+.gchips { scrollbar-width: none; }
+.gchips::-webkit-scrollbar { display: none; }
+.page-foot { margin: 10px 4px 0; }
+.plist-card { padding: 10px 14px 4px; }
+.plist-card .lrow:last-child { border-bottom: 0; }
+.plist-card .lrow .la { font-size: 12.5px; }
+.info-line { margin: 0 2px 16px; }
+.form-hint { margin: -2px 2px 2px; }
+.check { display: flex; gap: 10px; align-items: center; font-size: 14px; padding: 4px 0; }
+.check input { width: 20px; height: 20px; accent-color: var(--accent); flex: none; }
+.ghost.wide { width: 100%; }
+.danger-ghost { color: var(--bad); }
 @keyframes fade { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .panel, .scrim { animation: none; } }
 
@@ -312,20 +332,20 @@ const BUILTIN = [
   ['mackerel', 'Скумбрия', 'fish', 190, 18, 13, 0, { q: 'сыр.', d: 150, fatty: 1 }],
   // Яйца и молочное
   ['egg', 'Яйцо', 'dairy', 80, 6.5, 5.5, 0.4, { sg: 'eggs', u: 'pc', st: 1, d: 3, hint: '1 шт ≈ 55 г' }],
-  ['eggwhite', 'Яичный белок', 'dairy', 17, 3.6, 0.1, 0.2, { sg: 'eggs', u: 'pc', st: 1, d: 3, hint: 'Белок одного яйца ≈ 33 г' }],
+  ['eggwhite', 'Яичный белок', 'dairy', 17, 3.6, 0.1, 0.2, { sg: 'eggs', norand: 1, u: 'pc', st: 1, d: 3, hint: 'Белок одного яйца ≈ 33 г' }],
   ['cottage0', 'Творог 0%', 'dairy', 70, 16, 0.5, 1.5, { sg: 'curd', d: 200 }],
   ['cottage', 'Творог 5%', 'dairy', 120, 17, 5, 2, { sg: 'curd', d: 200 }],
   ['cottage9', 'Творог 9%', 'dairy', 160, 16, 9, 2, { sg: 'curd', d: 200, fatty: 1 }],
   ['grainy', 'Зернёный творог 5%', 'dairy', 105, 12, 5, 2, { sg: 'curd', d: 200 }],
   ['syrniki', 'Сырники', 'dairy', 388, 42.5, 15.7, 18.4, { sg: 'curd', u: 'pc', ul: 'порц.', st: 0.5, d: 1, hint: 'Порция: творог 5% 200 г + яйцо + мука 20 г, на сухой сковороде' }],
-  ['cheese', 'Сыр твёрдый', 'dairy', 350, 25, 27, 0, { sg: 'curd', st: 5, d: 30, fatty: 1 }],
-  ['skyr', 'Скир', 'dairy', 65, 11, 0.2, 4, { sg: 'milk', d: 250 }],
-  ['greek', 'Греческий йогурт 2%', 'dairy', 70, 9, 2, 4, { sg: 'milk', d: 250 }],
-  ['yogurt', 'Йогурт натуральный 2,5%', 'dairy', 60, 4, 2.5, 5, { sg: 'milk', d: 250 }],
-  ['kefir', 'Кефир 1%', 'dairy', 40, 3, 1, 4, { sg: 'milk', u: 'ml', st: 50, d: 500 }],
-  ['kefir25', 'Кефир 2,5%', 'dairy', 50, 3, 2.5, 4, { sg: 'milk', u: 'ml', st: 50, d: 500 }],
-  ['ryazhenka', 'Ряженка 2,5%', 'dairy', 55, 3, 2.5, 4.2, { sg: 'milk', u: 'ml', st: 50, d: 500 }],
-  ['milk', 'Молоко 1,5%', 'dairy', 45, 3, 1.5, 4.8, { sg: 'milk', u: 'ml', st: 50, d: 250 }],
+  ['cheese', 'Сыр твёрдый', 'dairy', 350, 25, 27, 0, { sg: 'cheese', st: 5, d: 30, fatty: 1 }],
+  ['skyr', 'Скир', 'dairy', 65, 11, 0.2, 4, { sg: 'yog', d: 250 }],
+  ['greek', 'Греческий йогурт 2%', 'dairy', 70, 9, 2, 4, { sg: 'yog', d: 250 }],
+  ['yogurt', 'Йогурт натуральный 2,5%', 'dairy', 60, 4, 2.5, 5, { sg: 'yog', d: 250 }],
+  ['kefir', 'Кефир 1%', 'dairy', 40, 3, 1, 4, { sg: 'drink', u: 'ml', st: 50, d: 500 }],
+  ['kefir25', 'Кефир 2,5%', 'dairy', 50, 3, 2.5, 4, { sg: 'drink', u: 'ml', st: 50, d: 500 }],
+  ['ryazhenka', 'Ряженка 2,5%', 'dairy', 55, 3, 2.5, 4.2, { sg: 'drink', u: 'ml', st: 50, d: 500 }],
+  ['milk', 'Молоко 1,5%', 'dairy', 45, 3, 1.5, 4.8, { sg: 'drink', u: 'ml', st: 50, d: 250 }],
   ['whey', 'Протеин', 'dairy', 120, 25, 1.5, 2, { sg: 'prot', u: 'pc', ul: 'порц.', st: 0.5, d: 1, hint: '1 порция = 30 г порошка' }],
   // Гарниры
   ['buckwheat', 'Гречка', 'garnish', 310, 12.5, 3, 62, { sg: 'grain', q: 'сух.', d: 80, dry: 1 }],
@@ -340,12 +360,12 @@ const BUILTIN = [
   ['millet', 'Пшено', 'garnish', 340, 11, 3, 67, { sg: 'grain', q: 'сух.', d: 80, dry: 1 }],
   ['quinoa', 'Киноа', 'garnish', 365, 14, 6, 64, { sg: 'grain', q: 'сух.', d: 80, dry: 1 }],
   ['lentil', 'Чечевица', 'garnish', 300, 24, 1.5, 50, { sg: 'grain', q: 'сух.', d: 80, dry: 1 }],
-  ['potato', 'Картофель', 'garnish', 77, 2, 0.4, 16, { sg: 'starch', q: 'сыр.', st: 50, d: 300 }],
-  ['sweetpotato', 'Батат', 'garnish', 85, 1.6, 0.1, 20, { sg: 'starch', q: 'сыр.', st: 50, d: 300 }],
-  ['bread', 'Хлеб', 'garnish', 250, 8, 3, 47, { sg: 'starch', st: 30, d: 60, hint: '1 кусок ≈ 30 г' }],
-  ['wholebread', 'Хлеб цельнозерновой', 'garnish', 230, 9, 3, 42, { sg: 'starch', st: 30, d: 60, hint: '1 кусок ≈ 30 г' }],
-  ['lavash', 'Лаваш тонкий', 'garnish', 275, 9, 1, 55, { sg: 'starch', d: 50 }],
-  ['flour', 'Мука пшеничная', 'garnish', 340, 10, 1, 70, { sg: 'starch', st: 5, d: 20, hidden: 1 }],
+  ['potato', 'Картофель', 'garnish', 77, 2, 0.4, 16, { sg: 'tuber', q: 'сыр.', st: 50, d: 300 }],
+  ['sweetpotato', 'Батат', 'garnish', 85, 1.6, 0.1, 20, { sg: 'tuber', q: 'сыр.', st: 50, d: 300 }],
+  ['bread', 'Хлеб', 'garnish', 250, 8, 3, 47, { sg: 'bread', st: 30, d: 60, hint: '1 кусок ≈ 30 г' }],
+  ['wholebread', 'Хлеб цельнозерновой', 'garnish', 230, 9, 3, 42, { sg: 'bread', st: 30, d: 60, hint: '1 кусок ≈ 30 г' }],
+  ['lavash', 'Лаваш тонкий', 'garnish', 275, 9, 1, 55, { sg: 'bread', d: 50 }],
+  ['flour', 'Мука пшеничная', 'garnish', 340, 10, 1, 70, { sg: 'bread', st: 5, d: 20, hidden: 1 }],
   // Овощи
   ['veg', 'Овощи (смесь)', 'veg', 30, 1.5, 0.2, 5, { st: 50, d: 200, hint: 'Огурцы, помидоры, капуста — что есть' }],
   ['cucumber', 'Огурцы', 'veg', 15, 0.8, 0.1, 3, { st: 50, d: 200 }],
@@ -405,16 +425,29 @@ const GROUPS = [
   ['snack', 'Перекусы'], ['fat', 'Масло и соусы'], ['other', 'Другое'],
 ];
 const GNAME = Object.fromEntries(GROUPS);
+// подгруппы: по ним строится случайное меню, поэтому свой продукт тоже выбирает подгруппу
 const SGNAME = {
-  eggs: 'Яйца', curd: 'Творог и сыр', milk: 'Йогурты, кефир, молоко', prot: 'Протеин',
-  grain: 'Крупы и макароны — сухой вес', starch: 'Картофель и хлеб',
+  eggs: 'Яйца', curd: 'Творог и сырники', yog: 'Йогурты и скир', drink: 'Кефир и молоко', cheese: 'Сыр', prot: 'Протеин',
+  grain: 'Крупы и макароны — сухой вес', tuber: 'Картофель и батат', bread: 'Хлеб и лаваш',
   fresh: 'Свежие', dried: 'Сухофрукты',
   nuts: 'Орехи и семечки', crisp: 'Хлебцы и батончики', sweet: 'Сладкое',
   oil: 'Масла', sauce: 'Соусы',
 };
 const SG_ORDER = Object.keys(SGNAME);
+const CAT_SG = {
+  dairy: ['eggs', 'curd', 'yog', 'drink', 'cheese', 'prot'], garnish: ['grain', 'tuber', 'bread'],
+  fruit: ['fresh', 'dried'], snack: ['nuts', 'crisp', 'sweet'], fat: ['oil', 'sauce'],
+};
+// куда попадает продукт подгруппы в случайном меню — подсказка в форме своего продукта
+const SG_ROLE = {
+  eggs: 'завтрак', curd: 'завтрак', yog: 'завтрак и перекус', drink: 'перекус', prot: 'перекус', cheese: '',
+  grain: 'гарнир к обеду и ужину', tuber: 'гарнир к обеду и ужину', bread: 'завтрак',
+  fresh: 'перекус и «в течение дня»', dried: '', nuts: '«в течение дня»', crisp: '', sweet: '',
+  oil: 'обед и ужин', sauce: '',
+};
+const CAT_ROLE = { meat: 'обед', fish: 'ужин', veg: 'обед и ужин', other: '' };
 // близкие подгруппы — для рекомендаций (яйца ближе к творогу, чем к кефиру)
-const SG_NEAR = { eggs: ['curd'], curd: ['eggs', 'milk'], milk: ['curd', 'prot'], prot: ['milk'], grain: [], starch: [] };
+const SG_NEAR = { eggs: ['curd', 'cheese'], curd: ['eggs', 'yog'], yog: ['curd', 'drink'], drink: ['yog', 'prot'], prot: ['drink', 'yog'], cheese: ['curd'], tuber: ['grain'], grain: ['tuber'] };
 const PROTEIN_G = new Set(['meat', 'fish', 'dairy']);
 
 const MEALS = [
@@ -537,21 +570,21 @@ const DAY_PLAN = {
   dinner: [['fish', 'pollock', 250], ['side', 'rice', 80], ['veg', 'veg', 200], ['oil', 'oil', 5]],
   extra: [['fruit', 'apple', 150], ['nuts', 'almonds', 30]],
 };
-const byCat = g => allProducts().filter(p => p.g === g).map(p => p.id);
+// наборы строятся по категории и подгруппе — свои продукты попадают в них сами (если не выключено «в случайном меню»)
 const POOLS = {
-  egg: ['egg'],
-  curd: ['cottage0', 'cottage', 'cottage9', 'grainy', 'syrniki', 'skyr', 'greek'],
-  bread: ['bread', 'wholebread', 'lavash', 'oats'],
-  side: () => allProducts().filter(p => p.g === 'garnish' && ((p.dry && p.id !== 'oats') || p.id === 'potato' || p.id === 'sweetpotato')).map(p => p.id),
-  meat: () => byCat('meat'),
-  fish: () => byCat('fish'),
-  veg: () => byCat('veg'),
-  oil: ['oil', 'olive'],
-  drink: ['kefir', 'kefir25', 'ryazhenka', 'greek', 'skyr', 'yogurt', 'whey'],
-  fruit: () => allProducts().filter(p => p.g === 'fruit' && p.sg !== 'dried').map(p => p.id),
-  nuts: ['almonds', 'walnut', 'cashew', 'peanut', 'pb'],
+  egg: p => p.g === 'dairy' && p.sg === 'eggs',
+  curd: p => p.g === 'dairy' && (p.sg === 'curd' || p.sg === 'yog'),
+  bread: p => p.g === 'garnish' && (p.sg === 'bread' || p.id === 'oats'),
+  side: p => p.g === 'garnish' && ((p.sg === 'grain' && p.id !== 'oats') || p.sg === 'tuber'),
+  meat: p => p.g === 'meat',
+  fish: p => p.g === 'fish',
+  veg: p => p.g === 'veg',
+  oil: p => p.g === 'fat' && p.sg === 'oil' && p.id !== 'butter',
+  drink: p => p.g === 'dairy' && (p.sg === 'drink' || p.sg === 'yog' || p.sg === 'prot'),
+  fruit: p => p.g === 'fruit' && p.sg === 'fresh',
+  nuts: p => p.g === 'snack' && p.sg === 'nuts',
 };
-function poolIds(k) { const p = POOLS[k]; return (typeof p === 'function' ? p() : p).filter(id => { const x = prod(id); return x && !x.hidden; }); }
+function poolIds(k) { return allProducts().filter(p => !p.norand && POOLS[k](p)).map(p => p.id); }
 
 // порция продукта x, равноценная a продукта pid: белковые — по белку, крупы — сухой вес, овощи и масло — тот же вес, остальное — по калориям
 function equivAmount(pid, a, xid) {
@@ -596,7 +629,7 @@ function generateDay(key, avoid) {
       for (const [pool, bid, ba] of DAY_PLAN[mk]) {
         const ids = poolIds(pool).filter(id => pool === 'oil' || !used.has(id));
         if (!ids.length) continue;
-        const pid = pickWeighted(ids, id => Math.pow(1 + freshness(lu, id, key), 1.5) * (avoid && avoid.has(id) ? 0.2 : 1));
+        const pid = pickWeighted(ids, id => Math.pow(1 + freshness(lu, id, key), 1.5) * (avoid && avoid.has(id) ? 0.2 : 1) * (prod(id).custom ? 2 : 1));
         used.add(pid);
         meals[mk].push({ id: uid(), p: pid, a: equivAmount(bid, ba, pid), done: false });
       }
@@ -616,8 +649,9 @@ function recommend(g, key, excludeId, n, sg, base) {
   const inDay = idsInDay(getDay(key)), lu = lastUsed(key);
   const kGap = id => base ? Math.abs(nutr(id, equivAmount(base.p, base.a, id)).k - nutr(base.p, base.a).k) / 30 : 0;
   return allProducts()
-    .filter(x => x.g === g && x.id !== excludeId && !inDay.has(x.id) && !x.oil && (x.sg !== 'sweet' || sg === 'sweet')) // сладкое — 1–2 раза в неделю, само не советуем
-    .map(x => ({ id: x.id, f: freshness(lu, x.id, key) + (sg && x.sg === sg ? 6 : (SG_NEAR[sg] || []).includes(x.sg) ? 4 : 0) + Math.random() * 4 - kGap(x.id) }))
+    .filter(x => x.g === g && x.id !== excludeId && !inDay.has(x.id) && !x.oil && !x.norand && (x.sg !== 'sweet' || sg === 'sweet')) // сладкое — 1–2 раза в неделю, само не советуем
+    // свои продукты — чуть вперёд: их заносят, чтобы есть
+    .map(x => ({ id: x.id, f: freshness(lu, x.id, key) + (sg && x.sg === sg ? 6 : (SG_NEAR[sg] || []).includes(x.sg) ? 4 : 0) + (x.custom ? 5 : 0) + Math.random() * 4 - kGap(x.id) }))
     .sort((a, b) => b.f - a.f).slice(0, n).map(o => o.id);
 }
 
@@ -745,7 +779,11 @@ const $toast = document.getElementById('toast');
 
 function render() {
   if (view.tab === 'day') { persistGenerated(); $app.innerHTML = renderDay(); }
-  else if (view.tab === 'products') $app.innerHTML = renderProducts();
+  else if (view.tab === 'products') {
+    $app.innerHTML = renderProducts();
+    const sel = $app.querySelector('.pchips [aria-pressed="true"]');
+    if (sel) sel.parentNode.scrollLeft = sel.offsetLeft - (sel.parentNode.clientWidth - sel.offsetWidth) / 2;
+  }
   else $app.innerHTML = renderRules();
   $tabs.innerHTML = [['day', 'День', IC.day], ['products', 'Продукты', IC.list], ['rules', 'Цели', IC.goal]]
     .map(([k, n, ic]) => `<button class="tab" data-act="tab" data-tab="${k}" ${view.tab === k ? 'aria-current="page"' : ''}>${ic}<span>${n}</span></button>`).join('');
@@ -824,40 +862,108 @@ function renderDay() {
   return h;
 }
 
+// вкладка «Продукты»: одна категория за раз, по строке на продукт; подробности — по нажатию
+let prodCat = 'meat';
+function perLabel(p) { return p.u === 'pc' ? '1 ' + unitLabel(p) : p.u === 'ml' ? '100 мл' : '100 г'; }
 function renderProducts() {
-  let h = `<h1 class="page-h">Продукты</h1><p class="page-sub">Значения на 100 г — примерные. Точные смотрите на этикетке. Крупы — сухой вес, мясо и рыба — сырой.</p><div class="stack">`;
-  for (const [g, gn] of GROUPS) {
-    const list = allProducts().filter(p => p.g === g);
-    if (!list.length) continue;
-    h += `<div class="sec-h">${gn}</div><div class="card">`;
-    for (const [sg, sl] of bySub(list)) {
-    h += subHead(sg) + '<ul class="plist">';
-    for (const p of sl) {
-      const per = p.u === 'pc' ? 'на 1 ' + unitLabel(p) : p.u === 'ml' ? 'на 100 мл' : 'на 100 г';
-      h += `<li class="prow"><div class="pn"><b>${esc(p.n)} ${p.q ? `<span class="tag">${p.q}</span>` : ''}</b><span class="num">${per}: Б ${f1(p.p)} · Ж ${f1(p.f)} · У ${f1(p.c)}${p.hint ? ' · ' + esc(p.hint) : ''}</span>
-        ${p.custom ? `<div><button class="dangerbtn" data-act="hideprod" data-pid="${p.id}">Убрать из списка</button></div>` : ''}</div>
-        <div class="pk num">${f0(p.k)}<small>ккал</small></div></li>`;
-    }
-    h += '</ul>';
-    }
-    h += '</div>';
-  }
-  h += `<div class="sec-h">Свой продукт</div>
-  <form class="card form" id="newprod">
-    <label class="fld"><span>Название</span><input id="np-name" required maxlength="60" placeholder="Например, сырники домашние"></label>
-    <div class="frow">
-      <label class="fld"><span>Группа</span><select id="np-group">${GROUPS.map(([g, n]) => `<option value="${g}">${n}</option>`).join('')}</select></label>
-      <label class="fld"><span>Считать</span><select id="np-unit"><option value="g">на 100 г</option><option value="ml">на 100 мл</option><option value="pc">на 1 шт</option></select></label>
-    </div>
-    <div class="frow4">
-      <label class="fld"><span>ккал</span><input id="np-k" inputmode="decimal" required></label>
-      <label class="fld"><span>Белки</span><input id="np-p" inputmode="decimal" required></label>
-      <label class="fld"><span>Жиры</span><input id="np-f" inputmode="decimal" required></label>
-      <label class="fld"><span>Углев.</span><input id="np-c" inputmode="decimal" required></label>
-    </div>
-    <button class="primary" type="submit">Добавить в список</button>
-  </form></div>`;
-  return h;
+  const mine = S.custom.filter(p => !p.hidden);
+  if (prodCat === 'mine' && !mine.length) prodCat = 'meat';
+  const chips = (mine.length ? [['mine', 'Мои']] : []).concat(GROUPS.filter(([g]) => allProducts().some(p => p.g === g)));
+  // «на 100 г» — в шапке списка; в строке подпись только у штучных и жидких
+  const row = p => `<button class="lrow" data-act="pinfo" data-pid="${p.id}"><span class="ln">${esc(p.n)}${p.custom && prodCat !== 'mine' ? ' <span class="tag">моё</span>' : ''}</span><span class="la num">${p.u === 'g' ? '' : 'на ' + perLabel(p)}</span><span class="ld num">${f0(p.k)}</span></button>`;
+  const body = prodCat === 'mine'
+    ? GROUPS.map(([g, gn]) => [gn, mine.filter(p => p.g === g)]).filter(([, l]) => l.length).map(([gn, l]) => `<div class="sub-h">${gn}</div>` + l.map(row).join('')).join('')
+    : bySub(allProducts().filter(p => p.g === prodCat)).map(([sg, sl]) => subHead(sg) + sl.map(row).join('')).join('');
+  return `<div class="ph"><h1 class="page-h">Продукты</h1><button class="addprod" data-act="np-open">${IC.plus}Свой продукт</button></div>
+    <p class="page-sub">Нажмите на продукт — покажу белки, жиры и углеводы.</p>
+    <div class="gchips pchips">${chips.map(([k, n]) => `<button class="chip" data-act="pg" data-g="${k}" aria-pressed="${prodCat === k}">${n}${k === 'mine' ? ` <span class="num">${mine.length}</span>` : ''}</button>`).join('')}</div>
+    <div class="card plist-card"><div class="list-h"><span>Продукт</span><span>ккал на 100 г</span></div>${body}</div>
+    <p class="rule-hint page-foot">Значения примерные, точнее — по этикетке.</p>`;
+}
+
+function productSheet(pid) {
+  openSheet({
+    draw(el) {
+      const p = prod(pid); if (!p) return closeSheet();
+      const where = [GNAME[p.g], p.sg && SGNAME[p.sg]].filter(Boolean).join(' · ');
+      const weight = p.q ? `, вес ${p.q === 'сух.' ? 'сухой' : 'сырой'}` : '';
+      el.innerHTML = `<div class="sw-head"><span class="eyebrow">${esc(where)}</span><h3 class="sh-h">${esc(p.n)}</h3><p class="sh-sub">на ${perLabel(p)}${weight}</p></div>
+        <div class="nline num"><div><b>${f1(p.k)}</b><span>ккал</span></div><div><b class="k-p">${f1(p.p)}</b><span>белки</span></div><div><b class="k-f">${f1(p.f)}</b><span>жиры</span></div><div><b class="k-c">${f1(p.c)}</b><span>углев.</span></div></div>
+        <p class="rule-hint info-line">Обычная порция: ${amountText(p, p.d || 100)}${p.hint ? ' · ' + esc(p.hint) : ''}${p.norand ? ' · в случайное меню не попадает' : ''}</p>
+        ${p.custom
+          ? `<div class="sh-actions"><button class="ghost danger-ghost" data-act="np-del" data-pid="${p.id}">Удалить</button><button class="primary" data-act="np-edit" data-pid="${p.id}">Изменить</button></div>`
+          : `<button class="ghost wide" data-act="close">Закрыть</button>`}`;
+    },
+  });
+}
+
+function productForm(pid) {
+  const ed = pid ? S.custom.find(x => x.id === pid) : null;
+  openSheet({
+    draw(el) {
+      const g0 = ed ? ed.g : (prodCat !== 'mine' ? prodCat : 'meat');
+      const num = (id, label, v) => `<label class="fld"><span>${label}</span><input id="${id}" inputmode="decimal" autocomplete="off" value="${v == null ? '' : v}"></label>`;
+      el.innerHTML = `<div class="sw-head"><span class="eyebrow">${ed ? 'Изменить' : 'Свой продукт'}</span><h3 class="sh-h">${ed ? esc(ed.n) : 'Новый продукт'}</h3></div>
+        <form id="pform" class="form" novalidate>
+          <label class="fld"><span>Название</span><input id="pf-name" maxlength="60" autocomplete="off" value="${ed ? esc(ed.n) : ''}" placeholder="Например, творожный сыр"></label>
+          <div class="frow">
+            <label class="fld"><span>Категория</span><select id="pf-g">${GROUPS.map(([g, n]) => `<option value="${g}" ${g === g0 ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+            <label class="fld" id="pf-sg-wrap"><span>Подгруппа</span><select id="pf-sg"></select></label>
+          </div>
+          <p class="rule-hint form-hint" id="pf-role"></p>
+          <div class="frow">
+            <label class="fld"><span>Значения указаны</span><select id="pf-u"><option value="g">на 100 г</option><option value="ml">на 100 мл</option><option value="pc">на 1 шт</option></select></label>
+            ${num('pf-d', '<span id="pf-d-label">Обычная порция, г</span>', ed ? ed.d : '')}
+          </div>
+          <div class="frow4">${num('pf-k', 'ккал', ed && ed.k)}${num('pf-p', 'Белки', ed && ed.p)}${num('pf-f', 'Жиры', ed && ed.f)}${num('pf-c', 'Углев.', ed && ed.c)}</div>
+          <label class="check"><input type="checkbox" id="pf-rand" ${ed && ed.norand ? '' : 'checked'}><span>Предлагать в случайном меню и советах</span></label>
+          <button class="primary" type="submit">${ed ? 'Сохранить' : 'Добавить'}</button>
+        </form>`;
+      const gSel = el.querySelector('#pf-g'), sgSel = el.querySelector('#pf-sg'), uSel = el.querySelector('#pf-u');
+      if (ed) uSel.value = ed.u;
+      const sync = keepSg => {
+        const g = gSel.value, subs = CAT_SG[g] || [];
+        el.querySelector('#pf-sg-wrap').hidden = !subs.length;
+        const keep = keepSg || sgSel.value;
+        sgSel.innerHTML = subs.map(s => `<option value="${s}" ${s === keep ? 'selected' : ''}>${SGNAME[s]}</option>`).join('');
+        const role = subs.length ? SG_ROLE[sgSel.value] : CAT_ROLE[g];
+        el.querySelector('#pf-role').textContent = role ? 'В случайном меню: ' + role + '. Заменять можно на продукты из этой же категории.' : 'В случайное меню сам не попадает — добавляйте через «Добавить продукт» или замену.';
+        el.querySelector('#pf-d-label').textContent = 'Обычная порция, ' + (uSel.value === 'pc' ? 'шт' : uSel.value === 'ml' ? 'мл' : 'г');
+      };
+      gSel.addEventListener('change', () => sync(''));
+      sgSel.addEventListener('change', () => sync(sgSel.value));
+      uSel.addEventListener('change', () => sync(sgSel.value));
+      sync(ed && ed.g === g0 ? ed.sg : '');
+      el.querySelector('#pform').addEventListener('submit', e => { e.preventDefault(); saveProduct(ed, el); });
+      if (!ed) setTimeout(() => el.querySelector('#pf-name').focus(), 60);
+    },
+  });
+}
+function saveProduct(ed, el) {
+  const v = id => parseFloat(String(el.querySelector(id).value).replace(',', '.'));
+  const n = el.querySelector('#pf-name').value.trim();
+  const [k, p, f, c] = ['#pf-k', '#pf-p', '#pf-f', '#pf-c'].map(v);
+  if (!n) { toast('Введите название'); return; }
+  if ([k, p, f, c].some(x => !isFinite(x) || x < 0)) { toast('Заполните ккал, белки, жиры и углеводы — числами, можно 0'); return; }
+  const g = el.querySelector('#pf-g').value, subs = CAT_SG[g] || [];
+  const sg = subs.length ? el.querySelector('#pf-sg').value : undefined;
+  const u = el.querySelector('#pf-u').value;
+  let d = v('#pf-d'); if (!isFinite(d) || d <= 0) d = u === 'pc' ? 1 : 100;
+  const data = {
+    n, g, sg, k, p, f, c, u, d, custom: 1,
+    st: u === 'pc' ? (d % 1 ? 0.5 : 1) : d < 50 ? 5 : 10,
+    q: g === 'meat' || g === 'fish' ? 'сыр.' : sg === 'grain' ? 'сух.' : undefined,
+    dry: sg === 'grain' ? 1 : undefined,
+    fatty: PROTEIN_G.has(g) && u !== 'pc' && f >= 6 ? 1 : undefined,
+    oil: sg === 'oil' ? 1 : undefined,
+    norand: el.querySelector('#pf-rand').checked ? undefined : 1,
+    hint: undefined,
+  };
+  undoStack.push(JSON.stringify(S));
+  if (ed) Object.assign(ed, data); else S.custom.push({ id: 'u_' + uid(), ...data });
+  prodCat = 'mine';
+  closeSheet(); commit();
+  toast(ed ? 'Сохранено' : 'Добавлено в «Мои»', true);
 }
 
 function renderRules() {
@@ -1159,7 +1265,11 @@ document.addEventListener('click', e => {
     case 'm-uncheck': mutate(d => { for (const [mk] of MEALS) for (const x of d.meals[mk] || []) x.done = false; }, true); closeSheet(); break;
     case 'm-clear': mutate(d => { for (const [mk] of MEALS) d.meals[mk] = []; }, true); closeSheet(); toast('День очищен', true); break;
     case 'kcal': S.targets.k = Math.max(1200, S.targets.k + +b.dataset.d); commit(); break;
-    case 'hideprod': { const p = S.custom.find(x => x.id === b.dataset.pid); if (p) { undoStack.push(JSON.stringify(S)); p.hidden = true; commit(); toast('Убрано из списка', true); } break; }
+    case 'pg': prodCat = b.dataset.g; render(); break;
+    case 'pinfo': productSheet(b.dataset.pid); break;
+    case 'np-open': productForm(); break;
+    case 'np-edit': productForm(b.dataset.pid); break;
+    case 'np-del': { const p = S.custom.find(x => x.id === b.dataset.pid); if (p) { undoStack.push(JSON.stringify(S)); p.hidden = 1; closeSheet(); commit(); toast('Удалено: ' + p.n, true); } break; }
     case 'undo': undo(); break;
   }
 });
@@ -1171,17 +1281,6 @@ document.addEventListener('change', e => {
     const r = S.targets[key].slice(); r[i] = v; if (r[0] > r[1]) r.reverse();
     S.targets[key] = r; commit();
   }
-});
-document.addEventListener('submit', e => {
-  if (e.target.id !== 'newprod') return;
-  e.preventDefault();
-  const val = id => parseFloat(String(document.getElementById(id).value).replace(',', '.'));
-  const n = document.getElementById('np-name').value.trim();
-  const [k, p, f, c] = ['np-k', 'np-p', 'np-f', 'np-c'].map(val);
-  if (!n || [k, p, f, c].some(x => !isFinite(x) || x < 0)) { toast('Заполните название и четыре числа'); return; }
-  const u = document.getElementById('np-unit').value;
-  S.custom.push({ id: 'u_' + uid(), n, g: document.getElementById('np-group').value, k, p, f, c, u, st: u === 'pc' ? 1 : 10, d: u === 'pc' ? 1 : 100, custom: 1 });
-  commit(); toast('Добавлено: ' + n);
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && sheetState) closeSheet(); });
 
