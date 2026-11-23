@@ -13,7 +13,7 @@
 <link rel="icon" href="icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
-<script>window.APP_VERSION = "23.11-b3fa0a";</script>
+<script>window.APP_VERSION = "23.11-ca3959";</script>
 <title>Рацион дня</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -106,7 +106,10 @@ input, select { font: inherit; color: inherit; }
 .b-p { background: var(--prot); } .b-f { background: var(--fat); } .b-c { background: var(--carb); }
 
 .draftnote { font-size: 12.5px; color: var(--muted); display: flex; align-items: center; gap: 8px; padding: 0 2px; }
-.draftnote::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--warn); flex: none; }
+.draftnote::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: none; }
+.draftnote span { min-width: 0; }
+.draftnote .linkbtn { margin-left: auto; white-space: nowrap; font-size: 13px; padding: 4px 0; }
+.why { color: var(--accent); font-weight: 600; }
 
 /* приёмы пищи */
 .meals { display: grid; gap: 14px; padding-top: 4px; }
@@ -386,6 +389,8 @@ const SGNAME = {
   oil: 'Масла', sauce: 'Соусы',
 };
 const SG_ORDER = Object.keys(SGNAME);
+// близкие подгруппы — для рекомендаций (яйца ближе к творогу, чем к кефиру)
+const SG_NEAR = { eggs: ['curd'], curd: ['eggs', 'milk'], milk: ['curd', 'prot'], prot: ['milk'], grain: [], starch: [] };
 const PROTEIN_G = new Set(['meat', 'fish', 'dairy']);
 
 const MEALS = [
@@ -409,8 +414,8 @@ const SWAPS = {
   buckwheat: { base: 80, opts: [{ it: [['bulgur', 80]] }, { it: [['potato', 300]] }] },
   kefir: { base: 500, opts: [{ it: [['whey', 1]], note: 'Протеиновый коктейль' }, { it: [['greek', 250]] }] },
   banana: { base: 120, opts: [{ it: [['citrus', 150]] }, { it: [['dates', 25]] }, { it: [['apricot', 25]] }] },
-  pollock: { base: 250, opts: [{ it: [['cod', 250]] }, { it: [['salmon', 200]], note: 'без масла' }] },
-  hake: { base: 250, opts: [{ it: [['cod', 250]] }, { it: [['salmon', 200]], note: 'без масла' }] },
+  pollock: { base: 250, opts: [{ it: [['cod', 250]] }, { it: [['salmon', 200]] }] },
+  hake: { base: 250, opts: [{ it: [['cod', 250]] }, { it: [['salmon', 200]] }] },
   rice: { base: 80, opts: [{ it: [['pasta', 80]] }, { it: [['couscous', 80]] }] },
   almonds: { base: 30, opts: [{ it: [['pb', 30]] }, { it: [['choc', 25]] }] },
 };
@@ -489,16 +494,119 @@ function dayFromTemplate(t) {
   for (const [mk] of MEALS) meals[mk] = (t[mk] || []).filter(([pid]) => prod(pid)).map(([pid, a]) => ({ id: uid(), p: pid, a, done: false }));
   return { meals, weight: null };
 }
+function emptyDay() { return { meals: Object.fromEntries(MEALS.map(([mk]) => [mk, []])), weight: null }; }
+
+/* ---------- случайное меню дня ---------- */
+// структура как у базового дня: у каждой позиции свой набор продуктов и эталон (продукт, количество) для пересчёта порции
+const DAY_PLAN = {
+  breakfast: [['egg', 'egg', 3], ['curd', 'cottage', 200], ['bread', 'bread', 60]],
+  lunch: [['meat', 'chicken', 200], ['side', 'buckwheat', 80], ['veg', 'veg', 200], ['oil', 'oil', 5]],
+  snack: [['drink', 'kefir', 500], ['fruit', 'banana', 120]],
+  dinner: [['fish', 'pollock', 250], ['side', 'rice', 80], ['veg', 'veg', 200], ['oil', 'oil', 5]],
+  extra: [['fruit', 'apple', 150], ['nuts', 'almonds', 30]],
+};
+const byCat = g => allProducts().filter(p => p.g === g).map(p => p.id);
+const POOLS = {
+  egg: ['egg'],
+  curd: ['cottage0', 'cottage', 'cottage9', 'grainy', 'syrniki', 'skyr', 'greek'],
+  bread: ['bread', 'wholebread', 'lavash', 'oats'],
+  side: () => allProducts().filter(p => p.g === 'garnish' && ((p.dry && p.id !== 'oats') || p.id === 'potato' || p.id === 'sweetpotato')).map(p => p.id),
+  meat: () => byCat('meat'),
+  fish: () => byCat('fish'),
+  veg: () => byCat('veg'),
+  oil: ['oil', 'olive'],
+  drink: ['kefir', 'kefir25', 'ryazhenka', 'greek', 'skyr', 'yogurt', 'whey'],
+  fruit: () => allProducts().filter(p => p.g === 'fruit' && p.sg !== 'dried').map(p => p.id),
+  nuts: ['almonds', 'walnut', 'cashew', 'peanut', 'pb'],
+};
+function poolIds(k) { const p = POOLS[k]; return (typeof p === 'function' ? p() : p).filter(id => { const x = prod(id); return x && !x.hidden; }); }
+
+// порция продукта x, равноценная a продукта pid: белковые — по белку, крупы — сухой вес, овощи и масло — тот же вес, остальное — по калориям
+function equivAmount(pid, a, xid) {
+  const p = prod(pid), x = prod(xid), cur = nutr(pid, a);
+  let r;
+  if (PROTEIN_G.has(p.g) && PROTEIN_G.has(x.g) && cur.p > 0 && x.p > 0) r = cur.p / (x.u === 'pc' ? x.p : x.p / 100);
+  else if ((p.dry && x.dry) || (p.g === 'veg' && x.g === 'veg' && p.u === x.u) || (p.oil && x.oil && p.u === x.u)) r = a;
+  else { const per = x.u === 'pc' ? x.k : x.k / 100; r = per ? cur.k / per : a; }
+  return roundStep(xid, r);
+}
+function idsInDay(d) { const s = new Set(); for (const [mk] of MEALS) for (const x of d.meals[mk] || []) s.add(x.p); return s; }
+// когда продукт последний раз был в меню до этого дня
+function lastUsed(beforeKey) {
+  const m = {};
+  for (const k of Object.keys(S.days)) {
+    if (k >= beforeKey) continue;
+    for (const id of idsInDay(S.days[k])) if (!m[id] || m[id] < k) m[id] = k;
+  }
+  return m;
+}
+function daysAgo(lu, pid, key) { return lu[pid] ? Math.round((parseKey(key) - parseKey(lu[pid])) / 864e5) : null; }
+function freshness(lu, pid, key) { const d = daysAgo(lu, pid, key); return d == null ? 15 : Math.min(d, 14); }
+function plural(n, a, b, c) { const m10 = n % 10, m100 = n % 100; return m10 === 1 && m100 !== 11 ? a : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? b : c; }
+function whyText(lu, pid, key) {
+  const d = daysAgo(lu, pid, key);
+  return d == null ? 'давно не было' : d <= 1 ? 'было вчера' : `не было ${d} ${plural(d, 'день', 'дня', 'дней')}`;
+}
+function pickWeighted(ids, w) {
+  const ws = ids.map(w), sum = ws.reduce((a, b) => a + b, 0);
+  let r = Math.random() * sum;
+  for (let i = 0; i < ids.length; i++) { r -= ws[i]; if (r <= 0) return ids[i]; }
+  return ids[ids.length - 1];
+}
+// несколько случайных попыток; берём первую, что укладывается в калории и белок, иначе лучшую
+function generateDay(key, avoid) {
+  const lu = lastUsed(key), T = S.targets;
+  let best = null;
+  for (let t = 0; t < 40; t++) {
+    const used = new Set(), meals = {};
+    for (const [mk] of MEALS) {
+      meals[mk] = [];
+      for (const [pool, bid, ba] of DAY_PLAN[mk]) {
+        const ids = poolIds(pool).filter(id => pool === 'oil' || !used.has(id));
+        if (!ids.length) continue;
+        const pid = pickWeighted(ids, id => Math.pow(1 + freshness(lu, id, key), 1.5) * (avoid && avoid.has(id) ? 0.2 : 1));
+        used.add(pid);
+        meals[mk].push({ id: uid(), p: pid, a: equivAmount(bid, ba, pid), done: false });
+      }
+      // жирный белок — масло в этом приёме не нужно
+      if (meals[mk].some(x => prod(x.p).fatty)) meals[mk] = meals[mk].filter(x => !prod(x.p).oil);
+    }
+    const s = dayTotals({ meals }).t;
+    const score = Math.abs(s.k - T.k) / 50 + Math.max(0, T.p[0] - s.p) / 4 + Math.max(0, s.f - T.f[1]) / 5 + Math.max(0, T.fMin - s.f) / 3;
+    if (!best || score < best.score) best = { score, meals };
+    if (score <= 3) break;
+  }
+  return { meals: best.meals, weight: null, gen: true };
+}
+// рекомендации в категории: чего нет в этом дне и что дольше всего не встречалось (своя подгруппа — вперёд)
+// base — заменяемая позиция {p, a}: варианты сильно калорийнее или легче уходят вниз
+function recommend(g, key, excludeId, n, sg, base) {
+  const inDay = idsInDay(getDay(key)), lu = lastUsed(key);
+  const kGap = id => base ? Math.abs(nutr(id, equivAmount(base.p, base.a, id)).k - nutr(base.p, base.a).k) / 30 : 0;
+  return allProducts()
+    .filter(x => x.g === g && x.id !== excludeId && !inDay.has(x.id) && !x.oil && (x.sg !== 'sweet' || sg === 'sweet')) // сладкое — 1–2 раза в неделю, само не советуем
+    .map(x => ({ id: x.id, f: freshness(lu, x.id, key) + (sg && x.sg === sg ? 6 : (SG_NEAR[sg] || []).includes(x.sg) ? 4 : 0) + Math.random() * 4 - kGap(x.id) }))
+    .sort((a, b) => b.f - a.f).slice(0, n).map(o => o.id);
+}
+
+let ready = false; // облако ответило (или его нет) — можно сохранять составленное меню
 const drafts = {};
 function getDay(k) {
   if (S.days[k]) return S.days[k];
-  if (!drafts[k]) drafts[k] = dayFromTemplate(S.template || BASE_DAY);
+  if (!drafts[k]) drafts[k] = k >= todayKey() ? generateDay(k) : emptyDay();
   return drafts[k];
+}
+function persistGenerated() {
+  const k = view.date;
+  if (!ready || S.days[k] || k < todayKey()) return;
+  S.days[k] = getDay(k); delete drafts[k];
+  S.updatedAt = Date.now(); saveLocal(); scheduleRemote();
 }
 function mutate(fn, withUndo) {
   if (withUndo) { undoStack.push(JSON.stringify(S)); if (undoStack.length > 20) undoStack.shift(); }
   const k = view.date;
   if (!S.days[k]) { S.days[k] = getDay(k); delete drafts[k]; }
+  S.days[k].gen = false;
   fn(S.days[k]);
   commit();
 }
@@ -537,18 +645,19 @@ async function initRemote() {
     const ref = db.doc('data/users/' + id + '/planner');
     const snap = await Promise.race([ref.get(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000))]);
     const r = snap.exists ? (snap.data() || {}).state : null;
-    if (r && (r.updatedAt || 0) > (S.updatedAt || 0)) { S = normalize(r); saveLocal(); }
+    if (r && (r.updatedAt || 0) > (S.updatedAt || 0)) { S = normalize(r); saveLocal(); clearDrafts(); }
     remoteRef = ref;
     sync = 'cloud';
     if (S.updatedAt > 0 && (!r || S.updatedAt > (r.updatedAt || 0))) scheduleRemote(0);
-    render();
     ref.onSnapshot(s => {
       if (!s.exists || s.metadata.hasPendingWrites) return;
       const st = (s.data() || {}).state;
-      if (st && (st.updatedAt || 0) > (S.updatedAt || 0)) { S = normalize(st); saveLocal(); render(); }
+      if (st && (st.updatedAt || 0) > (S.updatedAt || 0)) { S = normalize(st); saveLocal(); clearDrafts(); render(); }
     }, () => { sync = 'local'; render(); });
-  } catch (e) { sync = 'local'; render(); }
+  } catch (e) { sync = 'local'; }
+  finally { ready = true; render(); }
 }
+function clearDrafts() { for (const k of Object.keys(drafts)) delete drafts[k]; }
 function scheduleRemote(delay = 900) {
   if (!remoteRef) return;
   clearTimeout(rTimer);
@@ -602,7 +711,7 @@ const $sheet = document.getElementById('sheet');
 const $toast = document.getElementById('toast');
 
 function render() {
-  if (view.tab === 'day') $app.innerHTML = renderDay();
+  if (view.tab === 'day') { persistGenerated(); $app.innerHTML = renderDay(); }
   else if (view.tab === 'products') $app.innerHTML = renderProducts();
   else $app.innerHTML = renderRules();
   $tabs.innerHTML = [['day', 'День', IC.day], ['products', 'Продукты', IC.list], ['rules', 'Цели', IC.goal]]
@@ -652,7 +761,8 @@ function renderDay() {
         ${macroBlock('c', 'У', t.c, T.c)}
       </div>
     </div>
-    ${!S.days[k] ? `<div class="draftnote">План по шаблону — отметьте съеденное или поменяйте продукты</div>` : ''}
+    ${d.gen ? `<div class="draftnote"><span>Случайное меню: сначала то, чего давно не было</span><button class="linkbtn" data-act="regen">Другое меню</button></div>`
+      : (!S.days[k] && k < todayKey()) ? `<div class="draftnote"><span>За этот день ничего не записано</span><button class="linkbtn" data-act="regen">Составить меню</button></div>` : ''}
   </header><div class="meals">`;
   for (const [mk, mn] of MEALS) {
     const arr = d.meals[mk] || [];
@@ -854,10 +964,15 @@ function addSheet(mk) {
         box.innerHTML = `<p class="sh-sub">В категории «${GNAME[g]}» такого нет. Выберите другую категорию или добавьте свой продукт во вкладке «Продукты».</p>`;
         return;
       }
-      box.innerHTML = bySub(list).map(([sg, sl]) => subHead(sg) + '<div>' + sl.map(p => {
+      const lu = lastUsed(view.date), inDay = idsInDay(getDay(view.date));
+      const row = (p, why) => {
         const n = nutr(p.id, p.d || 100);
-        return `<button class="opt" data-act="pick" data-pid="${p.id}"><span class="on"><b>${esc(p.n)}</b><span class="num">${amountText(p, p.d || 100)} · Б ${f1(Math.round(n.p * 10) / 10)} · Ж ${f1(Math.round(n.f * 10) / 10)} · У ${f0(n.c)}</span></span><span class="od num"><b>${f0(n.k)}</b>ккал</span></button>`;
-      }).join('') + '</div>').join('');
+        const tags = (why ? `<span class="why">${why}</span> · ` : '') + (inDay.has(p.id) ? 'уже есть сегодня · ' : '');
+        return `<button class="opt" data-act="pick" data-pid="${p.id}"><span class="on"><b>${esc(p.n)}</b><span class="num">${tags}${amountText(p, p.d || 100)} · Б ${f1(Math.round(n.p * 10) / 10)} · Ж ${f1(Math.round(n.f * 10) / 10)} · У ${f0(n.c)}</span></span><span class="od num"><b>${f0(n.k)}</b>ккал</span></button>`;
+      };
+      const rec = q ? [] : recommend(g, view.date, null, 2);
+      box.innerHTML = (rec.length ? `<div class="sub-h">Рекомендуем</div><div>${rec.map(id => row(prod(id), whyText(lu, id, view.date))).join('')}</div>` : '')
+        + bySub(list.filter(p => !rec.includes(p.id))).map(([sg, sl]) => subHead(sg) + '<div>' + sl.map(p => row(p)).join('') + '</div>').join('');
     },
     setG(v) { g = v; st.list(); },
     mk,
@@ -865,25 +980,25 @@ function addSheet(mk) {
   openSheet(st);
 }
 
+// варианты замены ОДНОГО продукта на один другой из той же категории
 function swapOptions(it) {
-  const p = prod(it.p), cur = nutr(it.p, it.a), out = [];
+  const key = view.date, p = prod(it.p), out = [], lu = lastUsed(key), inDay = idsInDay(getDay(key));
+  const has = id => out.some(o => o.items[0][0] === id);
+  const opt = (sec, id, a, extra) => ({ sec, sg: prod(id).sg || '', items: [[id, a]], today: inDay.has(id), ...extra });
+  for (const id of recommend(p.g, key, it.p, 3, p.sg, it)) out.push(opt('rec', id, equivAmount(it.p, it.a, id), { why: whyText(lu, id, key) }));
   const sw = SWAPS[it.p];
   if (sw) {
     const r = it.a / sw.base;
     for (const o of sw.opts) {
-      // только варианты из той же категории
-      if (!o.it.every(([pid]) => { const x = prod(pid); return x && !x.hidden && x.g === p.g; })) continue;
-      out.push({ sec: 'plan', note: o.note, items: o.it.map(([pid, a]) => [pid, roundStep(pid, a * r)]) });
+      if (o.it.length !== 1) continue; // наборы из нескольких продуктов не предлагаем
+      const [id, a] = o.it[0], x = prod(id);
+      if (!x || x.hidden || x.g !== p.g || has(id)) continue;
+      out.push(opt('plan', id, roundStep(id, a * r), { note: o.note }));
     }
   }
   for (const x of allProducts()) {
-    if (x.id === it.p || x.g !== p.g) continue;
-    if (out.some(o => o.items.length === 1 && o.items[0][0] === x.id)) continue;
-    let a;
-    if (PROTEIN_G.has(p.g) && cur.p > 0) { const per = x.u === 'pc' ? x.p : x.p / 100; if (!per) continue; a = cur.p / per; }
-    else if ((p.dry && x.dry) || (p.g === 'veg' && x.u === p.u)) a = it.a;
-    else { const per = x.u === 'pc' ? x.k : x.k / 100; if (!per) continue; a = cur.k / per; }
-    out.push({ sec: 'rule', sg: x.sg || '', items: [[x.id, roundStep(x.id, a)]] });
+    if (x.id === it.p || x.g !== p.g || has(x.id)) continue;
+    out.push(opt('rule', x.id, equivAmount(it.p, it.a, x.id)));
   }
   return out;
 }
@@ -905,14 +1020,17 @@ function swapSheet(itemId) {
         const n = o.items.reduce((a, [pid, am]) => addN(a, nutr(pid, am)), zero());
         const dk = n.k - cur.k, dp = n.p - cur.p;
         const name = o.items.map(([pid, am]) => `${esc(prod(pid).n)} ${amountText(prod(pid), am)}`).join(' + ');
-        return `<button class="opt" data-act="do-swap" data-i="${i}"><span class="on"><b>${o.note ? esc(o.note) + ': ' : ''}${name}</b><span class="num">Б ${f1(Math.round(n.p * 10) / 10)} · Ж ${f1(Math.round(n.f * 10) / 10)} · У ${f0(n.c)}</span></span>
+        const tags = (o.why ? `<span class="why">${o.why}</span> · ` : '') + (o.today ? 'уже есть сегодня · ' : '');
+        return `<button class="opt" data-act="do-swap" data-i="${i}"><span class="on"><b>${o.note ? esc(o.note) + ': ' : ''}${name}</b><span class="num">${tags}Б ${f1(Math.round(n.p * 10) / 10)} · Ж ${f1(Math.round(n.f * 10) / 10)} · У ${f0(n.c)}</span></span>
           <span class="od num"><b>${f0(n.k)}</b>${dk >= 0 ? '+' : '−'}${f0(Math.abs(dk))} ккал${Math.abs(dp) >= 1 ? `<br>Б ${dp > 0 ? '+' : '−'}${f0(Math.abs(dp))}` : ''}</span></button>`;
       };
+      const rec = opts.map((o, i) => [o, i]).filter(([o]) => o.sec === 'rec');
       const plan = opts.map((o, i) => [o, i]).filter(([o]) => o.sec === 'plan');
       const rule = opts.map((o, i) => [o, i]).filter(([o]) => o.sec === 'rule');
       const subs = [...new Set(rule.map(([o]) => o.sg))].sort((a, b) => (a === (p.sg || '') ? -1 : b === (p.sg || '') ? 1 : SG_ORDER.indexOf(a) - SG_ORDER.indexOf(b)));
-      el.innerHTML = `<h3 class="sh-h">Заменить: ${GNAME[p.g].toLowerCase()}</h3><p class="sh-sub num">${esc(p.n)} ${amountText(p, f.it.a)} · ${f0(cur.k)} ккал · Б ${f1(Math.round(cur.p * 10) / 10)}</p>
-        ${plan.length ? `<div class="sec-h" style="margin:0 0 4px">Из плана</div><div>${plan.map(([o, i]) => row(o, i)).join('')}</div>` : ''}
+      el.innerHTML = `<h3 class="sh-h">Заменить: ${esc(p.n.toLowerCase())}</h3><p class="sh-sub num">${amountText(p, f.it.a)} · ${f0(cur.k)} ккал · Б ${f1(Math.round(cur.p * 10) / 10)} · меняется только этот продукт, на другой из категории «${GNAME[p.g]}»</p>
+        ${rec.length ? `<div class="sec-h" style="margin:0 0 4px">Рекомендуем</div><div>${rec.map(([o, i]) => row(o, i)).join('')}</div>` : ''}
+        ${plan.length ? `<div class="sec-h" style="margin:14px 0 4px">Из плана</div><div>${plan.map(([o, i]) => row(o, i)).join('')}</div>` : ''}
         ${rule.length ? `<div class="sec-h" style="margin:14px 0 4px">${ruleTitle(p)}</div>` + subs.map(sg => subHead(sg) + `<div>${rule.filter(([o]) => o.sg === sg).map(([o, i]) => row(o, i)).join('')}</div>`).join('') : ''}`;
     },
   };
@@ -921,21 +1039,17 @@ function swapSheet(itemId) {
 }
 function doSwap(i) {
   const st = sheetState; if (!st || !st.opts) return;
-  const o = st.opts[i]; const id = st.itemId;
-  let removedOil = false, fattyName = '';
+  const [pid, a] = st.opts[i].items[0], id = st.itemId;
+  let oilMeal = null;
   mutate(d => {
     const f = findItem(d, id); if (!f) return;
     const wasFatty = !!prod(f.it.p).fatty;
-    const fresh = o.items.map(([pid, a]) => ({ id: uid(), p: pid, a, done: false }));
-    f.arr.splice(f.i, 1, ...fresh);
-    const fat = fresh.find(x => prod(x.p).fatty);
-    if (fat && !wasFatty) {
-      const oi = f.arr.findIndex(x => prod(x.p).oil);
-      if (oi >= 0) { f.arr.splice(oi, 1); removedOil = true; fattyName = prod(fat.p).n.toLowerCase(); }
-    }
+    f.arr[f.i] = { id: uid(), p: pid, a, done: false }; // меняется только эта позиция
+    if (prod(pid).fatty && !wasFatty && f.arr.some(x => prod(x.p) && prod(x.p).oil)) oilMeal = f.mk;
   }, true);
   closeSheet();
-  toast(removedOil ? `Заменено. Масло из приёма убрано: ${fattyName} жирнее` : 'Заменено', true);
+  if (oilMeal) toast(`${prod(pid).n} жирнее — масло в этом приёме можно не добавлять`, true, { label: 'Убрать масло', meal: oilMeal });
+  else toast('Заменено', true);
 }
 
 function dayMenu() {
@@ -944,11 +1058,12 @@ function dayMenu() {
     draw(el) {
       const d = getDay(view.date);
       el.innerHTML = `<h3 class="sh-h">${esc(dateTitle(view.date))}</h3><p class="sh-sub">Что сделать с этим днём</p>
+        <button class="menu-i" data-act="regen">Другое случайное меню<span>Сначала продукты, которых давно не было</span></button>
         <button class="menu-i" data-act="m-weight">Записать вес<span>${d.weight ? 'Сейчас: ' + f1(d.weight) + ' кг' : 'Утром натощак — для среднего за неделю'}</span></button>
         <button class="menu-i" data-act="m-yesterday">Как вчера<span>Скопировать продукты ${S.days[y] ? 'за ' + dateTitle(y).toLowerCase() : '— вчера ничего не записано'}</span></button>
         <button class="menu-i" data-act="m-base">Базовый день<span>~2400 ккал, ~185 г белка — из плана</span></button>
         ${S.template ? `<button class="menu-i" data-act="m-mine">Мой шаблон<span>День, сохранённый как шаблон</span></button>` : ''}
-        <button class="menu-i" data-act="m-save">Сохранить этот день как шаблон<span>Новые дни будут начинаться с него</span></button>
+        <button class="menu-i" data-act="m-save">Сохранить этот день как шаблон<span>Потом его можно поставить в любой день отсюда же</span></button>
         <button class="menu-i" data-act="m-uncheck">Снять все отметки «съедено»</button>
         <button class="menu-i danger" data-act="m-clear">Очистить день</button>`;
     },
@@ -977,11 +1092,11 @@ function weightSheet() {
 
 /* ---------- тост ---------- */
 let tTimer;
-function toast(text, withUndo) {
-  $toast.innerHTML = `<span>${esc(text)}</span>${withUndo && undoStack.length ? '<button data-act="undo">Вернуть</button>' : ''}`;
+function toast(text, withUndo, action) {
+  $toast.innerHTML = `<span>${esc(text)}</span>${action ? `<button data-act="drop-oil" data-meal="${action.meal}">${esc(action.label)}</button>` : ''}${withUndo && undoStack.length ? '<button data-act="undo">Вернуть</button>' : ''}`;
   $toast.hidden = false;
   clearTimeout(tTimer);
-  tTimer = setTimeout(hideToast, 4500);
+  tTimer = setTimeout(hideToast, action ? 8000 : 4500);
 }
 function hideToast() { $toast.hidden = true; }
 
@@ -1024,6 +1139,16 @@ document.addEventListener('click', e => {
       if (!y) { toast('Вчера ничего не записано'); break; }
       const tpl = {}; for (const [mk] of MEALS) tpl[mk] = (y.meals[mk] || []).map(x => [x.p, x.a]);
       mutate(d => { d.meals = dayFromTemplate(tpl).meals; }, true); closeSheet(); toast('Скопировано со вчера', true); break;
+    }
+    case 'regen': {
+      const avoid = idsInDay(getDay(view.date));
+      mutate(d => { d.meals = generateDay(view.date, avoid).meals; d.gen = true; }, true);
+      closeSheet(); toast('Составлено другое меню', true); break;
+    }
+    case 'drop-oil': {
+      const mk = b.dataset.meal;
+      mutate(d => { d.meals[mk] = (d.meals[mk] || []).filter(x => !(prod(x.p) && prod(x.p).oil)); }, true);
+      toast('Масло убрано', true); break;
     }
     case 'm-base': mutate(d => { d.meals = dayFromTemplate(BASE_DAY).meals; }, true); closeSheet(); toast('Поставлен базовый день', true); break;
     case 'm-mine': mutate(d => { d.meals = dayFromTemplate(S.template).meals; }, true); closeSheet(); toast('Поставлен мой шаблон', true); break;
