@@ -13,7 +13,7 @@
 <link rel="icon" href="icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
-<script>window.APP_VERSION = "23.11-ca3959";</script>
+<script>window.APP_VERSION = "23.11-ab3161";</script>
 <title>Рацион дня</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -73,6 +73,7 @@ input, select { font: inherit; color: inherit; }
 .datebar { display: flex; align-items: center; gap: 4px; }
 .iconbtn { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; color: var(--muted); }
 .iconbtn:active { background: var(--surface-2); }
+.iconbtn[disabled] { opacity: .25; cursor: default; }
 .iconbtn svg { width: 22px; height: 22px; }
 .datebtn { flex: 1; min-width: 0; text-align: center; display: grid; gap: 0; }
 .datebtn b { font-family: var(--f-display); font-weight: 800; font-size: 19px; letter-spacing: -.01em; }
@@ -178,14 +179,6 @@ input, select { font: inherit; color: inherit; }
 .stepper .v { min-width: 64px; text-align: center; font-weight: 700; font-size: 17px; }
 .sbtn { width: 38px; height: 38px; border-radius: 12px; background: var(--surface-2); font-size: 20px; font-weight: 600; display: grid; place-items: center; }
 .sbtn:active { background: var(--line); }
-.weeks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.wk { background: var(--bg); border-radius: 14px; padding: 10px 12px; }
-.wk small { color: var(--muted); font-size: 12px; }
-.wk b { display: block; font-family: var(--f-display); font-size: 22px; font-weight: 800; }
-.delta { font-size: 13px; margin-top: 8px; }
-.wlist { display: flex; gap: 6px; overflow-x: auto; padding-block: 8px 2px; }
-.wchip { flex: none; background: var(--bg); border-radius: 10px; padding: 6px 8px; text-align: center; font-size: 12px; color: var(--muted); }
-.wchip b { display: block; color: var(--ink); font-size: 14px; }
 .storage { font-size: 13px; color: var(--muted); display: flex; gap: 8px; align-items: center; }
 .storage i { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); flex: none; }
 .storage.on i { background: var(--accent); }
@@ -430,9 +423,7 @@ const RULES = [
   'Если продукт жирнее (бедро, горбуша, говядина) — убрать масло из этого приёма.',
   'Сладкое и алкоголь — 1–2 раза в неделю в рамках калорий.',
   'Шаги: 8–10 тысяч в день.',
-  'Нормальный темп: −0,5…0,8 кг в неделю. Смотреть среднее за неделю, а не один день.',
   'Плато 2–3 недели (вес и талия стоят) → минус 100–150 ккал.',
-  'После отмены креатина в первые 2–4 недели может уйти 1–2 кг воды — это не жир.',
 ];
 
 /* ---------- состояние ---------- */
@@ -488,6 +479,16 @@ function todayKey() { return keyOf(new Date()); }
 function keyOf(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
 function parseKey(k) { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); }
 function shiftKey(k, n) { const d = parseKey(k); d.setDate(d.getDate() + n); return keyOf(d); }
+// доступны только вчера, сегодня и завтра
+function clampDate(k) { const lo = shiftKey(todayKey(), -1), hi = shiftKey(todayKey(), 1); return k < lo ? lo : k > hi ? hi : k; }
+// дни старше двух недель не нужны: короткая история нужна только для «давно не было»
+const KEEP_DAYS = 14;
+function pruneDays() {
+  const lo = shiftKey(todayKey(), -KEEP_DAYS);
+  let n = 0;
+  for (const k of Object.keys(S.days)) if (k < lo) { delete S.days[k]; n++; }
+  return n;
+}
 
 function dayFromTemplate(t) {
   const meals = {};
@@ -689,7 +690,7 @@ function dateHint(k) {
   if (k === t) return ['сегодня', true];
   if (k === shiftKey(t, -1)) return ['вчера', false];
   if (k === shiftKey(t, 1)) return ['завтра', false];
-  return ['к сегодняшнему дню', false];
+  return ['', false];
 }
 function amountText(p, a) { return f1(a) + ' ' + unitLabel(p) + (p.q ? ' ' + p.q : ''); }
 
@@ -746,9 +747,9 @@ function renderDay() {
   const leftTxt = Math.abs(left) <= 50 ? 'в цели' : left > 0 ? 'ещё ' + f0(left) : 'перебор ' + f0(-left);
   let h = `<header class="top">
     <div class="datebar">
-      <button class="iconbtn" data-act="prev" aria-label="Предыдущий день">${IC.prev}</button>
+      <button class="iconbtn" data-act="prev" aria-label="Предыдущий день" ${k <= shiftKey(todayKey(), -1) ? 'disabled' : ''}>${IC.prev}</button>
       <button class="datebtn" data-act="today"><b>${esc(dateTitle(k))}</b><span class="${isToday ? 'today' : ''}">${hint}</span></button>
-      <button class="iconbtn" data-act="next" aria-label="Следующий день">${IC.next}</button>
+      <button class="iconbtn" data-act="next" aria-label="Следующий день" ${k >= shiftKey(todayKey(), 1) ? 'disabled' : ''}>${IC.next}</button>
       <button class="iconbtn" data-act="daymenu" aria-label="Действия с днём">${IC.more}</button>
     </div>
     <div class="sum">
@@ -827,22 +828,8 @@ function renderProducts() {
   return h;
 }
 
-function weekAvg(endKey) {
-  const vals = [];
-  for (let i = 0; i < 7; i++) { const d = S.days[shiftKey(endKey, -i)]; if (d && d.weight) vals.push(d.weight); }
-  return vals.length ? { avg: vals.reduce((a, b) => a + b, 0) / vals.length, n: vals.length } : null;
-}
 function renderRules() {
-  const T = S.targets, t = todayKey();
-  const w1 = weekAvg(t), w0 = weekAvg(shiftKey(t, -7));
-  const recent = [];
-  for (let i = 13; i >= 0; i--) { const k = shiftKey(t, -i); const d = S.days[k]; if (d && d.weight) recent.push([k, d.weight]); }
-  let delta = '';
-  if (w1 && w0) {
-    const dd = w1.avg - w0.avg;
-    const ok = dd <= -0.5 && dd >= -0.8;
-    delta = `<div class="delta num">За неделю: <b class="${ok ? 'k-p' : ''}">${dd > 0 ? '+' : ''}${f1(Math.round(dd * 10) / 10)} кг</b> — ${dd > -0.2 ? 'стоит; если так 2–3 недели — убавьте 100–150 ккал' : dd < -1 ? 'быстрее нормы; проверьте, хватает ли еды' : 'в нормальном темпе'}</div>`;
-  }
+  const T = S.targets;
   return `<h1 class="page-h">Цели на день</h1><p class="page-sub">Поддержание ~2950–3000 ккал, цель — снижать жир и сохранить мышцы.</p>
   <div class="stack">
     <div class="card">
@@ -851,16 +838,6 @@ function renderRules() {
       ${rangeRow('p', 'Белок, г', 'Главный приоритет', T.p)}
       ${rangeRow('f', 'Жиры, г', 'Не ниже ' + T.fMin + ' г', T.f)}
       ${rangeRow('c', 'Углеводы, г', 'Остаток калорий', T.c)}
-    </div>
-    <div class="sec-h">Вес</div>
-    <div class="card">
-      <div class="weeks">
-        <div class="wk"><small>Среднее за 7 дней</small><b class="num">${w1 ? f1(Math.round(w1.avg * 10) / 10) + ' кг' : '—'}</b><small>${w1 ? 'замеров: ' + w1.n : 'нет замеров'}</small></div>
-        <div class="wk"><small>Неделей раньше</small><b class="num">${w0 ? f1(Math.round(w0.avg * 10) / 10) + ' кг' : '—'}</b><small>${w0 ? 'замеров: ' + w0.n : 'нет замеров'}</small></div>
-      </div>
-      ${delta}
-      ${recent.length ? `<div class="wlist">${recent.map(([k, w]) => `<div class="wchip num">${parseKey(k).getDate()}.${String(parseKey(k).getMonth() + 1).padStart(2, '0')}<b>${f1(w)}</b></div>`).join('')}</div>` : ''}
-      <div style="margin-top:10px"><button class="linkbtn" data-act="weight">Записать вес за ${view.date === t ? 'сегодня' : dateTitle(view.date).toLowerCase()}</button></div>
     </div>
     <div class="sec-h">Правила</div>
     <div class="card"><ol class="rules">${RULES.map(r => `<li>${r}</li>`).join('')}</ol></div>
@@ -1059,32 +1036,12 @@ function dayMenu() {
       const d = getDay(view.date);
       el.innerHTML = `<h3 class="sh-h">${esc(dateTitle(view.date))}</h3><p class="sh-sub">Что сделать с этим днём</p>
         <button class="menu-i" data-act="regen">Другое случайное меню<span>Сначала продукты, которых давно не было</span></button>
-        <button class="menu-i" data-act="m-weight">Записать вес<span>${d.weight ? 'Сейчас: ' + f1(d.weight) + ' кг' : 'Утром натощак — для среднего за неделю'}</span></button>
         <button class="menu-i" data-act="m-yesterday">Как вчера<span>Скопировать продукты ${S.days[y] ? 'за ' + dateTitle(y).toLowerCase() : '— вчера ничего не записано'}</span></button>
         <button class="menu-i" data-act="m-base">Базовый день<span>~2400 ккал, ~185 г белка — из плана</span></button>
         ${S.template ? `<button class="menu-i" data-act="m-mine">Мой шаблон<span>День, сохранённый как шаблон</span></button>` : ''}
         <button class="menu-i" data-act="m-save">Сохранить этот день как шаблон<span>Потом его можно поставить в любой день отсюда же</span></button>
         <button class="menu-i" data-act="m-uncheck">Снять все отметки «съедено»</button>
         <button class="menu-i danger" data-act="m-clear">Очистить день</button>`;
-    },
-  };
-  openSheet(st);
-}
-function weightSheet() {
-  const st = {
-    draw(el) {
-      const d = getDay(view.date);
-      el.innerHTML = `<h3 class="sh-h">Вес</h3><p class="sh-sub">${esc(dateTitle(view.date))}. Утром, натощак, в одно время.</p>
-        <form id="wform"><div class="readout"><div class="scale"><input id="w-in" type="number" inputmode="decimal" step="0.1" min="30" max="300" value="${d.weight || ''}" placeholder="104,0" aria-label="Вес в килограммах"><small>кг</small></div></div>
-        <div class="sh-actions"><button class="ghost" type="button" data-act="close">Отмена</button><button class="primary" type="submit">Записать</button></div></form>`;
-      el.querySelector('#wform').addEventListener('submit', e => {
-        e.preventDefault();
-        const v = parseFloat(String(el.querySelector('#w-in').value).replace(',', '.'));
-        if (!isFinite(v) || v < 30 || v > 300) { toast('Введите вес в килограммах, например 103,6'); return; }
-        mutate(d => { d.weight = Math.round(v * 10) / 10; });
-        closeSheet(); toast('Вес записан');
-      });
-      setTimeout(() => { const i = el.querySelector('#w-in'); if (i) i.focus(); }, 60);
     },
   };
   openSheet(st);
@@ -1106,8 +1063,8 @@ document.addEventListener('click', e => {
   const a = b.dataset.act;
   switch (a) {
     case 'tab': view.tab = b.dataset.tab; try { history.replaceState(null, '', '#' + view.tab); } catch (_) { } render(); window.scrollTo(0, 0); break;
-    case 'prev': view.date = shiftKey(view.date, -1); render(); break;
-    case 'next': view.date = shiftKey(view.date, 1); render(); break;
+    case 'prev': view.date = clampDate(shiftKey(view.date, -1)); render(); break;
+    case 'next': view.date = clampDate(shiftKey(view.date, 1)); render(); break;
     case 'today': view.date = todayKey(); render(); break;
     case 'toggle': mutate(d => { const f = findItem(d, b.dataset.id); if (f) f.it.done = !f.it.done; }); break;
     case 'amount': amountSheet(b.dataset.id); break;
@@ -1133,7 +1090,6 @@ document.addEventListener('click', e => {
     }
     case 'close': closeSheet(); break;
     case 'daymenu': dayMenu(); break;
-    case 'weight': case 'm-weight': weightSheet(); break;
     case 'm-yesterday': {
       const y = S.days[shiftKey(view.date, -1)];
       if (!y) { toast('Вчера ничего не записано'); break; }
@@ -1188,6 +1144,13 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && sheetState
 
 /* ---------- старт ---------- */
 loadLocal();
+if (pruneDays()) saveLocal();
+// приложение могло остаться открытым через полночь — вернуть на сегодня
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  const k = clampDate(view.date);
+  if (k !== view.date || view.date !== todayKey()) { view.date = todayKey(); render(); }
+});
 const h0 = (location.hash || '').slice(1);
 if (['day', 'products', 'rules'].includes(h0)) view.tab = h0;
 render();
