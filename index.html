@@ -116,7 +116,7 @@ input, select { font: inherit; color: inherit; }
 .ibody .amt { color: var(--ink); font-weight: 600; }
 .ikc { font-weight: 600; font-size: 14px; min-width: 40px; text-align: right; }
 .ikc small { display: block; font-size: 10.5px; color: var(--muted); font-weight: 500; }
-.swbtn { width: 42px; height: 48px; display: grid; place-items: center; color: var(--muted); flex: none; border-radius: 12px; }
+.swbtn { width: 42px; height: 48px; display: grid; place-items: center; color: var(--muted); opacity: .6; flex: none; border-radius: 12px; }
 .swbtn svg { width: 20px; height: 20px; }
 .swbtn:active { background: var(--surface-2); }
 .swbtn[disabled] { visibility: hidden; }
@@ -185,7 +185,38 @@ input, select { font: inherit; color: inherit; }
 .grip { width: 40px; height: 5px; border-radius: 999px; background: var(--line); margin: 0 auto 10px; }
 .sh-h { font-family: var(--f-display); font-weight: 800; font-size: 19px; margin: 0 0 2px; letter-spacing: -.01em; }
 .sh-sub { color: var(--muted); font-size: 13.5px; margin: 0 0 14px; }
-@keyframes rise { from { transform: translateY(40px); opacity: .4; } }
+@keyframes rise { from { transform: translateY(40px); } }
+
+/* листы замены и добавления: сначала 2–3 совета, полный список — по запросу, одна строка на продукт */
+.sw-head { display: grid; gap: 2px; margin-bottom: 14px; }
+.sw-head .sh-h { margin: 0; font-size: 21px; }
+.sw-head .sh-sub { margin: 0; }
+.eyebrow { font-size: 11.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.panel .sec-h { margin: 0 2px 8px; }
+.sugg { display: grid; gap: 8px; }
+.sg-card { width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; padding: 12px 14px; border-radius: 16px; background: var(--accent-soft); }
+.sg-card:active { filter: brightness(.96); }
+.sg-main { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.sg-main b { font-weight: 600; font-size: 15.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sg-main span { font-size: 13px; color: var(--muted); }
+.pill { flex: none; font-size: 12.5px; font-weight: 600; padding: 5px 10px; border-radius: 999px; background: var(--surface); color: var(--ink); white-space: nowrap; }
+.pill.same, .pill.ok { color: var(--accent); }
+.pill.more { color: var(--warn); }
+.rule-hint { font-size: 12.5px; color: var(--muted); margin: 10px 2px 0; }
+.more-btn { width: 100%; display: flex; align-items: center; justify-content: space-between; margin-top: 14px; padding: 14px 2px; border-top: 1px solid var(--line); font-weight: 600; }
+.more-btn .cnt { color: var(--muted); font-weight: 500; margin-left: 4px; }
+.more-btn svg { width: 20px; height: 20px; color: var(--muted); transition: transform .2s; }
+.more-btn[aria-expanded="true"] svg { transform: rotate(180deg); }
+.list-h { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted); padding: 2px 2px 4px; letter-spacing: .02em; }
+.panel .sub-h { padding: 14px 2px 4px; }
+.lrow { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto 56px; gap: 10px; align-items: baseline; padding: 12px 2px; border-bottom: 1px solid var(--line); text-align: left; }
+.lrow .ln { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lrow .la { color: var(--muted); font-size: 13.5px; white-space: nowrap; }
+.lrow .ld { text-align: right; font-size: 13.5px; font-weight: 600; color: var(--muted); }
+.lrow .ld.ok { color: var(--ink); }
+.lrow .ld.more { color: var(--warn); }
+.lrow.dim { opacity: .45; }
+.lrow:active { background: var(--surface-2); }
 @keyframes fade { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .panel, .scrim { animation: none; } }
 
@@ -683,6 +714,7 @@ const IC = {
   more: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
   swap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4L3 8l4 4"/><path d="M3 8h13a4 4 0 0 1 4 4"/><path d="M17 20l4-4-4-4"/><path d="M21 16H8a4 4 0 0 1-4-4"/></svg>',
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  chev: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
   day: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="7"/><circle cx="12" cy="13" r="3.2"/><path d="M4 4v5M2.5 4v3a1.5 1.5 0 0 0 3 0V4M20 4c-1.5 1-2 2.5-2 4.5V11h2"/></svg>',
   list: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.2" fill="currentColor"/><circle cx="4.5" cy="12" r="1.2" fill="currentColor"/><circle cx="4.5" cy="18" r="1.2" fill="currentColor"/></svg>',
   goal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
@@ -751,7 +783,7 @@ function renderDay() {
   for (const [mk, mn] of MEALS) {
     const arr = d.meals[mk] || [];
     const mt = arr.reduce((a, it) => addN(a, nutr(it.p, it.a)), zero());
-    h += `<section class="meal"><div class="mh"><h2>${mn}</h2>${arr.length ? `<span class="mk num"><b>${f0(mt.k)}</b> ккал · Б ${f0(mt.p)}</span>` : ''}</div>`;
+    h += `<section class="meal"><div class="mh"><h2>${mn}</h2>${arr.length ? `<span class="mk num"><b>${f0(mt.k)}</b> ккал</span>` : ''}</div>`;
     if (arr.length) {
       h += '<ul class="items">';
       for (const it of arr) {
@@ -760,8 +792,8 @@ function renderDay() {
         const canSwap = allProducts().some(x => x.g === p.g && x.id !== p.id);
         h += `<li class="item ${it.done ? 'done' : ''}">
           <button class="chk" data-act="toggle" data-id="${it.id}" aria-label="${it.done ? 'Снять отметку' : 'Отметить съеденным'}: ${esc(p.n)}"></button>
-          <button class="ibody" data-act="amount" data-id="${it.id}"><span class="nm">${esc(p.n)}</span><span class="sub num"><span class="amt">${amountText(p, it.a)}</span> · Б ${f1(Math.round(n.p * 10) / 10)} · Ж ${f1(Math.round(n.f * 10) / 10)} · У ${f0(n.c)}</span></button>
-          <span class="ikc num">${f0(n.k)}<small>ккал</small></span>
+          <button class="ibody" data-act="amount" data-id="${it.id}"><span class="nm">${esc(p.n)}</span><span class="sub num"><span class="amt">${amountText(p, it.a)}</span>${n.p >= 1 ? ` · белок ${f0(n.p)} г` : ''}</span></button>
+          <span class="ikc num">${f0(n.k)}</span>
           <button class="swbtn" data-act="swap" data-id="${it.id}" aria-label="Заменить ${esc(p.n)}" ${canSwap ? '' : 'disabled'}>${IC.swap}</button>
         </li>`;
       }
@@ -902,10 +934,10 @@ function defaultCat(mk) {
 }
 function addSheet(mk) {
   let q = '', g = defaultCat(mk);
+  const recCache = {}; // рекомендации не перетасовываются при каждом нажатии
   const st = {
     draw(el) {
-      el.innerHTML = `<h3 class="sh-h">Добавить: ${MEALS.find(m => m[0] === mk)[1].toLowerCase()}</h3>
-        <p class="sh-sub">Сначала категория, потом продукт из неё</p>
+      el.innerHTML = `<div class="sw-head"><span class="eyebrow">Добавить</span><h3 class="sh-h">${MEALS.find(m => m[0] === mk)[1]}</h3></div>
         <div class="gchips" id="add-g"></div>
         <input class="search" id="add-q" type="search" placeholder="Поиск в категории" autocomplete="off">
         <div id="add-list"></div>`;
@@ -921,18 +953,17 @@ function addSheet(mk) {
       if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: 'nearest', inline: 'center' });
       const list = allProducts().filter(p => p.g === g && (!q || p.n.toLowerCase().includes(q)));
       if (!list.length) {
-        box.innerHTML = `<p class="sh-sub">В категории «${GNAME[g]}» такого нет. Выберите другую категорию или добавьте свой продукт во вкладке «Продукты».</p>`;
+        box.innerHTML = `<p class="rule-hint">В категории «${GNAME[g]}» такого нет.</p>`;
         return;
       }
       const lu = lastUsed(view.date), inDay = idsInDay(getDay(view.date));
-      const row = (p, why) => {
-        const n = nutr(p.id, p.d || 100);
-        const tags = (why ? `<span class="why">${why}</span> · ` : '') + (inDay.has(p.id) ? 'уже есть сегодня · ' : '');
-        return `<button class="opt" data-act="pick" data-pid="${p.id}"><span class="on"><b>${esc(p.n)}</b><span class="num">${tags}${amountText(p, p.d || 100)} · Б ${f1(Math.round(n.p * 10) / 10)} · Ж ${f1(Math.round(n.f * 10) / 10)} · У ${f0(n.c)}</span></span><span class="od num"><b>${f0(n.k)}</b>ккал</span></button>`;
-      };
-      const rec = q ? [] : recommend(g, view.date, null, 2);
-      box.innerHTML = (rec.length ? `<div class="sub-h">Рекомендуем</div><div>${rec.map(id => row(prod(id), whyText(lu, id, view.date))).join('')}</div>` : '')
-        + bySub(list.filter(p => !rec.includes(p.id))).map(([sg, sl]) => subHead(sg) + '<div>' + sl.map(p => row(p)).join('') + '</div>').join('');
+      const rec = q ? [] : (recCache[g] || (recCache[g] = recommend(g, view.date, null, 2)));
+      const card = p => `<button class="sg-card" data-act="pick" data-pid="${p.id}"><span class="sg-main"><b>${esc(p.n)}</b><span class="num">${amountText(p, p.d || 100)} · ${whyText(lu, p.id, view.date)}</span></span><span class="pill num">${f0(nutr(p.id, p.d || 100).k)} ккал</span></button>`;
+      const row = p => `<button class="lrow ${inDay.has(p.id) ? 'dim' : ''}" data-act="pick" data-pid="${p.id}"><span class="ln">${esc(p.n)}</span><span class="la num">${amountText(p, p.d || 100)}</span><span class="ld num">${f0(nutr(p.id, p.d || 100).k)}</span></button>`;
+      const rest = list.filter(p => !rec.includes(p.id));
+      box.innerHTML = (rec.length ? `<div class="sec-h">Советуем</div><div class="sugg">${rec.map(id => card(prod(id))).join('')}</div>` : '')
+        + `<div class="list-h"><span>${q ? 'Найдено' : 'Все в категории'}</span><span>ккал</span></div>`
+        + bySub(rest).map(([sg, sl]) => subHead(sg) + sl.map(row).join('')).join('');
     },
     setG(v) { g = v; st.list(); },
     mk,
@@ -962,37 +993,48 @@ function swapOptions(it) {
   }
   return out;
 }
-function ruleTitle(p) {
-  if (PROTEIN_G.has(p.g)) return 'Столько же белка';
-  if (p.g === 'garnish') return p.dry ? 'Крупы — тот же сухой вес, остальное по калориям' : 'По калориям';
-  if (p.g === 'veg') return 'Тот же вес';
-  return 'По калориям';
+// разница в калориях: близкое — «≈ столько же», заметно больше — предупреждение
+function kDiff(dk) {
+  const a = Math.abs(dk);
+  if (a < 25) return ['same', '≈ столько же', '≈'];
+  return [dk > 60 ? 'more' : 'ok', (dk > 0 ? '+' : '−') + f0(a) + ' ккал', (dk > 0 ? '+' : '−') + f0(a)];
+}
+function ruleHint(p, cur) {
+  if (PROTEIN_G.has(p.g)) return `Порции подобраны на те же ${f0(cur.p)} г белка`;
+  if (p.dry) return 'Крупы — тот же сухой вес, остальное — те же калории';
+  if (p.g === 'veg') return 'Порции — тот же вес';
+  return `Порции подобраны на те же ${f0(cur.k)} ккал`;
 }
 function swapSheet(itemId) {
+  let open = false;
   const st = {
     draw(el) {
       const d = getDay(view.date), f = findItem(d, itemId);
       if (!f) return closeSheet();
       const p = prod(f.it.p), cur = nutr(f.it.p, f.it.a);
-      const opts = swapOptions(f.it);
-      st.opts = opts;
-      const row = (o, i) => {
-        const n = o.items.reduce((a, [pid, am]) => addN(a, nutr(pid, am)), zero());
-        const dk = n.k - cur.k, dp = n.p - cur.p;
-        const name = o.items.map(([pid, am]) => `${esc(prod(pid).n)} ${amountText(prod(pid), am)}`).join(' + ');
-        const tags = (o.why ? `<span class="why">${o.why}</span> · ` : '') + (o.today ? 'уже есть сегодня · ' : '');
-        return `<button class="opt" data-act="do-swap" data-i="${i}"><span class="on"><b>${o.note ? esc(o.note) + ': ' : ''}${name}</b><span class="num">${tags}Б ${f1(Math.round(n.p * 10) / 10)} · Ж ${f1(Math.round(n.f * 10) / 10)} · У ${f0(n.c)}</span></span>
-          <span class="od num"><b>${f0(n.k)}</b>${dk >= 0 ? '+' : '−'}${f0(Math.abs(dk))} ккал${Math.abs(dp) >= 1 ? `<br>Б ${dp > 0 ? '+' : '−'}${f0(Math.abs(dp))}` : ''}</span></button>`;
+      const opts = st.opts || (st.opts = swapOptions(f.it)); // один раз: рекомендации не прыгают при раскрытии списка
+      const idx = opts.map((o, i) => [o, i]);
+      const top = [...idx.filter(([o]) => o.sec === 'plan').slice(0, 1), ...idx.filter(([o]) => o.sec === 'rec')].slice(0, 3);
+      const topSet = new Set(top.map(([, i]) => i));
+      const rest = idx.filter(([, i]) => !topSet.has(i));
+      const subs = [...new Set(rest.map(([o]) => o.sg))].sort((a, b) => (a === (p.sg || '') ? -1 : b === (p.sg || '') ? 1 : SG_ORDER.indexOf(a) - SG_ORDER.indexOf(b)));
+      const dkOf = o => nutr(o.items[0][0], o.items[0][1]).k - cur.k;
+      const card = ([o, i]) => {
+        const x = prod(o.items[0][0]), [cls, txt] = kDiff(dkOf(o));
+        const why = o.sec === 'plan' ? 'по плану' : o.why;
+        return `<button class="sg-card" data-act="do-swap" data-i="${i}"><span class="sg-main"><b>${esc(o.note || x.n)}</b><span class="num">${amountText(x, o.items[0][1])}${why ? ' · ' + why : ''}</span></span><span class="pill num ${cls}">${txt}</span></button>`;
       };
-      const rec = opts.map((o, i) => [o, i]).filter(([o]) => o.sec === 'rec');
-      const plan = opts.map((o, i) => [o, i]).filter(([o]) => o.sec === 'plan');
-      const rule = opts.map((o, i) => [o, i]).filter(([o]) => o.sec === 'rule');
-      const subs = [...new Set(rule.map(([o]) => o.sg))].sort((a, b) => (a === (p.sg || '') ? -1 : b === (p.sg || '') ? 1 : SG_ORDER.indexOf(a) - SG_ORDER.indexOf(b)));
-      el.innerHTML = `<h3 class="sh-h">Заменить: ${esc(p.n.toLowerCase())}</h3><p class="sh-sub num">${amountText(p, f.it.a)} · ${f0(cur.k)} ккал · Б ${f1(Math.round(cur.p * 10) / 10)} · меняется только этот продукт, на другой из категории «${GNAME[p.g]}»</p>
-        ${rec.length ? `<div class="sec-h" style="margin:0 0 4px">Рекомендуем</div><div>${rec.map(([o, i]) => row(o, i)).join('')}</div>` : ''}
-        ${plan.length ? `<div class="sec-h" style="margin:14px 0 4px">Из плана</div><div>${plan.map(([o, i]) => row(o, i)).join('')}</div>` : ''}
-        ${rule.length ? `<div class="sec-h" style="margin:14px 0 4px">${ruleTitle(p)}</div>` + subs.map(sg => subHead(sg) + `<div>${rule.filter(([o]) => o.sg === sg).map(([o, i]) => row(o, i)).join('')}</div>`).join('') : ''}`;
+      const row = ([o, i]) => {
+        const x = prod(o.items[0][0]), [cls, , short] = kDiff(dkOf(o));
+        return `<button class="lrow ${o.today ? 'dim' : ''}" data-act="do-swap" data-i="${i}"><span class="ln">${esc(x.n)}</span><span class="la num">${amountText(x, o.items[0][1])}</span><span class="ld num ${cls}">${short}</span></button>`;
+      };
+      el.innerHTML = `<div class="sw-head"><span class="eyebrow">Замена</span><h3 class="sh-h">${esc(p.n)}</h3><p class="sh-sub num">${amountText(p, f.it.a)} · ${f0(cur.k)} ккал</p></div>
+        ${top.length ? `<div class="sec-h">Советуем</div><div class="sugg">${top.map(card).join('')}</div>` : ''}
+        <p class="rule-hint">${ruleHint(p, cur)}</p>
+        ${rest.length ? `<button class="more-btn" data-act="sw-more" aria-expanded="${open || !top.length}"><span>Все варианты <span class="cnt num">${rest.length}</span></span>${IC.chev}</button>` : ''}
+        ${open || !top.length ? `<div class="list-h"><span>Продукт и порция</span><span>ккал</span></div>` + subs.map(sg => subHead(sg) + rest.filter(([o]) => o.sg === sg).map(row).join('')).join('') : ''}`;
     },
+    toggle() { open = !open; st.draw(document.getElementById('sheet-body')); },
   };
   st.itemId = itemId;
   openSheet(st);
@@ -1053,6 +1095,7 @@ document.addEventListener('click', e => {
     case 'amount': amountSheet(b.dataset.id); break;
     case 'swap': swapSheet(b.dataset.id); break;
     case 'do-swap': doSwap(+b.dataset.i); break;
+    case 'sw-more': sheetState && sheetState.toggle && sheetState.toggle(); break;
     case 'add': addSheet(b.dataset.meal); break;
     case 'add-g': sheetState && sheetState.setG && sheetState.setG(b.dataset.g); break;
     case 'pick': {
