@@ -13,7 +13,7 @@
 <link rel="icon" href="icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
-<script>window.APP_VERSION = "23.11-74ab77";</script>
+<script>window.APP_VERSION = "24.11-2991fc";</script>
 <title>Рацион дня</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -252,6 +252,14 @@ input, select { font: inherit; color: inherit; }
 .check { display: flex; gap: 10px; align-items: center; font-size: 14px; padding: 4px 0; }
 .check input { width: 20px; height: 20px; accent-color: var(--accent); flex: none; }
 .ghost.wide { width: 100%; }
+.fhead { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); margin-top: 4px; }
+.fhead .mini { padding: 6px 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); font-size: 13px; }
+.fhead-note { margin-left: auto; font-size: 12px; }
+.warn-t { color: var(--warn); }
+/* факт: «съедено» в окне количества и строка продукта, съеденного не по плану */
+.fact-row { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; text-align: left; padding: 12px 14px; margin-bottom: 14px; border-radius: 14px; background: var(--bg); font-size: 14px; }
+.fact-row .linkbtn { font-size: 13.5px; }
+.item.off .ibody .sub .amt { color: var(--warn); }
 .danger-ghost { color: var(--bad); }
 @keyframes fade { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .panel, .scrim { animation: none; } }
@@ -523,12 +531,21 @@ function bySub(list, firstSg) {
   return [...m.entries()].sort((a, b) => (a[0] === firstSg ? -1 : b[0] === firstSg ? 1 : SG_ORDER.indexOf(a[0]) - SG_ORDER.indexOf(b[0])));
 }
 function subHead(sg) { return sg && SGNAME[sg] ? `<div class="sub-h">${SGNAME[sg]}</div>` : ''; }
+// питательность одной единицы количества: 1 г или 1 мл; для штучных — 1 шт
+// (свои штучные хранят значения на 100 г и вес штуки pw — порция считается сама)
+function perUnit(p) {
+  const m = p.u === 'pc' ? (p.pw ? p.pw / 100 : 1) : 1 / 100;
+  return { k: p.k * m, p: p.p * m, f: p.f * m, c: p.c * m };
+}
 function nutr(pid, a) {
   const p = prod(pid);
   if (!p) return { k: 0, p: 0, f: 0, c: 0 };
-  const m = p.u === 'pc' ? a : a / 100;
-  return { k: p.k * m, p: p.p * m, f: p.f * m, c: p.c * m };
+  const u = perUnit(p);
+  return { k: u.k * a, p: u.p * a, f: u.f * a, c: u.c * a };
 }
+// сколько съедено: факт, если отмечен, иначе — по плану
+function eatAmt(it) { return it.done && it.fact != null ? it.fact : it.a; }
+function itemN(it) { return nutr(it.p, eatAmt(it)); }
 function addN(t, n) { t.k += n.k; t.p += n.p; t.f += n.f; t.c += n.c; return t; }
 function zero() { return { k: 0, p: 0, f: 0, c: 0 }; }
 function unitLabel(p) { return p.ul || (p.u === 'ml' ? 'мл' : p.u === 'pc' ? 'шт' : 'г'); }
@@ -588,12 +605,33 @@ function poolIds(k) { return allProducts().filter(p => !p.norand && POOLS[k](p))
 
 // порция продукта x, равноценная a продукта pid: белковые — по белку, крупы — сухой вес, овощи и масло — тот же вес, остальное — по калориям
 function equivAmount(pid, a, xid) {
-  const p = prod(pid), x = prod(xid), cur = nutr(pid, a);
+  const p = prod(pid), x = prod(xid), cur = nutr(pid, a), u = perUnit(x);
   let r;
-  if (PROTEIN_G.has(p.g) && PROTEIN_G.has(x.g) && cur.p > 0 && x.p > 0) r = cur.p / (x.u === 'pc' ? x.p : x.p / 100);
+  if (PROTEIN_G.has(p.g) && PROTEIN_G.has(x.g) && cur.p > 0 && u.p > 0) r = cur.p / u.p;
   else if ((p.dry && x.dry) || (p.g === 'veg' && x.g === 'veg' && p.u === x.u) || (p.oil && x.oil && p.u === x.u)) r = a;
-  else { const per = x.u === 'pc' ? x.k : x.k / 100; r = per ? cur.k / per : a; }
+  else r = u.k ? cur.k / u.k : a;
+  // не больше 2,5 обычных порций: иначе продукт с малым белком превращается в полкило
+  r = Math.min(r, (x.d || 100) * 2.5);
   return roundStep(xid, r);
+}
+// сколько ккал можно отдать позиции: цель минус остальной день, но не меньше, чем она даёт сейчас
+function slotRoom(day, it) {
+  const t = dayTotals(day).t, cur = itemN(it);
+  return Math.max(S.targets.k - (t.k - cur.k), cur.k);
+}
+// порция замены: по правилу равноценности, но в пределах оставшихся на день калорий
+function fitAmount(it, xid, room) {
+  const x = prod(xid), u = perUnit(x), st = x.st || 10;
+  let a = equivAmount(it.p, it.a, xid);
+  if (u.k > 0 && a * u.k > room + 15) a = Math.max(st, Math.floor(room / u.k / st) * st);
+  return a;
+}
+// порция при добавлении: обычная, но не больше остатка до цели (если он есть)
+function addAmount(p) {
+  const room = S.targets.k - dayTotals(getDay(view.date)).t.k, u = perUnit(p), st = p.st || 10;
+  let a = p.d || 100;
+  if (room > 0 && u.k > 0 && a * u.k > room + 15) a = Math.max(st, Math.floor(room / u.k / st) * st);
+  return a;
 }
 function idsInDay(d) { const s = new Set(); for (const [mk] of MEALS) for (const x of d.meals[mk] || []) s.add(x.p); return s; }
 // когда продукт последний раз был в меню до этого дня
@@ -647,7 +685,13 @@ function generateDay(key, avoid) {
 // base — заменяемая позиция {p, a}: варианты сильно калорийнее или легче уходят вниз
 function recommend(g, key, excludeId, n, sg, base) {
   const inDay = idsInDay(getDay(key)), lu = lastUsed(key);
-  const kGap = id => base ? Math.abs(nutr(id, equivAmount(base.p, base.a, id)).k - nutr(base.p, base.a).k) / 30 : 0;
+  // штраф за разницу в ккал и, для белковых, за недобор белка — с порцией в пределах остатка дня
+  const room = base ? slotRoom(getDay(key), base) : 0, bn = base ? itemN(base) : null;
+  const kGap = id => {
+    if (!base) return 0;
+    const n = nutr(id, fitAmount(base, id, room));
+    return Math.abs(n.k - bn.k) / 30 + (PROTEIN_G.has(g) ? Math.max(0, bn.p - n.p) / 3 : 0);
+  };
   return allProducts()
     .filter(x => x.g === g && x.id !== excludeId && !inDay.has(x.id) && !x.oil && !x.norand && (x.sg !== 'sweet' || sg === 'sweet')) // сладкое — 1–2 раза в неделю, само не советуем
     // свои продукты — чуть вперёд: их заносят, чтобы есть
@@ -691,7 +735,8 @@ function undo() {
 }
 function dayTotals(d) {
   const t = zero(), e = zero();
-  for (const [mk] of MEALS) for (const it of d.meals[mk] || []) { const n = nutr(it.p, it.a); addN(t, n); if (it.done) addN(e, n); }
+  // t — прогноз дня (съеденное по факту + остальное по плану), e — уже съедено
+  for (const [mk] of MEALS) for (const it of d.meals[mk] || []) { const n = itemN(it); addN(t, n); if (it.done) addN(e, n); }
   return { t, e };
 }
 function findItem(d, id) {
@@ -757,7 +802,7 @@ function dateHint(k) {
   if (k === shiftKey(t, 1)) return ['завтра', false];
   return ['', false];
 }
-function amountText(p, a) { return f1(a) + ' ' + unitLabel(p) + (p.q ? ' ' + p.q : ''); }
+function amountText(p, a) { return f1(a) + ' ' + unitLabel(p) + (p.pw ? ` · ${f0(a * p.pw)} г` : '') + (p.q ? ' ' + p.q : ''); }
 
 const IC = {
   prev: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
@@ -837,17 +882,20 @@ function renderDay() {
   </header><div class="meals">`;
   for (const [mk, mn] of MEALS) {
     const arr = d.meals[mk] || [];
-    const mt = arr.reduce((a, it) => addN(a, nutr(it.p, it.a)), zero());
+    const mt = arr.reduce((a, it) => addN(a, itemN(it)), zero());
     h += `<section class="meal"><div class="mh"><h2>${mn}</h2>${arr.length ? `<span class="mk num"><b>${f0(mt.k)}</b> ккал</span>` : ''}</div>`;
     if (arr.length) {
       h += '<ul class="items">';
       for (const it of arr) {
         const p = prod(it.p); if (!p) continue;
-        const n = nutr(it.p, it.a);
+        const n = itemN(it);
         const canSwap = allProducts().some(x => x.g === p.g && x.id !== p.id);
-        h += `<li class="item ${it.done ? 'done' : ''}">
+        // съедено не по плану — показываем факт и план рядом
+        const off = it.done && it.fact != null && it.fact !== it.a;
+        const amt = off ? `<span class="amt">съел ${amountText(p, it.fact)}</span> из ${f1(it.a)}` : `<span class="amt">${amountText(p, it.a)}</span>`;
+        h += `<li class="item ${it.done ? 'done' : ''} ${off ? 'off' : ''}">
           <button class="chk" data-act="toggle" data-id="${it.id}" aria-label="${it.done ? 'Снять отметку' : 'Отметить съеденным'}: ${esc(p.n)}"></button>
-          <button class="ibody" data-act="amount" data-id="${it.id}"><span class="nm">${esc(p.n)}</span><span class="sub num"><span class="amt">${amountText(p, it.a)}</span>${n.p >= 1 ? ` · белок ${f0(n.p)} г` : ''}</span></button>
+          <button class="ibody" data-act="${it.done ? 'fact' : 'amount'}" data-id="${it.id}"><span class="nm">${esc(p.n)}</span><span class="sub num">${amt}${n.p >= 1 ? ` · белок ${f0(n.p)} г` : ''}</span></button>
           <span class="ikc num">${f0(n.k)}</span>
           <button class="swbtn" data-act="swap" data-id="${it.id}" aria-label="Заменить ${esc(p.n)}" ${canSwap ? '' : 'disabled'}>${IC.swap}</button>
         </li>`;
@@ -864,13 +912,14 @@ function renderDay() {
 
 // вкладка «Продукты»: одна категория за раз, по строке на продукт; подробности — по нажатию
 let prodCat = 'meat';
-function perLabel(p) { return p.u === 'pc' ? '1 ' + unitLabel(p) : p.u === 'ml' ? '100 мл' : '100 г'; }
+// на что указаны значения: штучные из справочника — на 1 шт, свои штучные — на 100 г (+ вес штуки)
+function perLabel(p) { return p.u === 'pc' && !p.pw ? '1 ' + unitLabel(p) : (p.u === 'ml' || p.b === 'ml') ? '100 мл' : '100 г'; }
 function renderProducts() {
   const mine = S.custom.filter(p => !p.hidden);
   if (prodCat === 'mine' && !mine.length) prodCat = 'meat';
   const chips = (mine.length ? [['mine', 'Мои']] : []).concat(GROUPS.filter(([g]) => allProducts().some(p => p.g === g)));
   // «на 100 г» — в шапке списка; в строке подпись только у штучных и жидких
-  const row = p => `<button class="lrow" data-act="pinfo" data-pid="${p.id}"><span class="ln">${esc(p.n)}${p.custom && prodCat !== 'mine' ? ' <span class="tag">моё</span>' : ''}</span><span class="la num">${p.u === 'g' ? '' : 'на ' + perLabel(p)}</span><span class="ld num">${f0(p.k)}</span></button>`;
+  const row = p => `<button class="lrow" data-act="pinfo" data-pid="${p.id}"><span class="ln">${esc(p.n)}${p.custom && prodCat !== 'mine' ? ' <span class="tag">моё</span>' : ''}</span><span class="la num">${p.u === 'g' ? '' : p.pw ? `1 шт = ${f0(p.pw)} г` : 'на ' + perLabel(p)}</span><span class="ld num">${f0(p.k)}</span></button>`;
   const body = prodCat === 'mine'
     ? GROUPS.map(([g, gn]) => [gn, mine.filter(p => p.g === g)]).filter(([, l]) => l.length).map(([gn, l]) => `<div class="sub-h">${gn}</div>` + l.map(row).join('')).join('')
     : bySub(allProducts().filter(p => p.g === prodCat)).map(([sg, sl]) => subHead(sg) + sl.map(row).join('')).join('');
@@ -889,7 +938,8 @@ function productSheet(pid) {
       const weight = p.q ? `, вес ${p.q === 'сух.' ? 'сухой' : 'сырой'}` : '';
       el.innerHTML = `<div class="sw-head"><span class="eyebrow">${esc(where)}</span><h3 class="sh-h">${esc(p.n)}</h3><p class="sh-sub">на ${perLabel(p)}${weight}</p></div>
         <div class="nline num"><div><b>${f1(p.k)}</b><span>ккал</span></div><div><b class="k-p">${f1(p.p)}</b><span>белки</span></div><div><b class="k-f">${f1(p.f)}</b><span>жиры</span></div><div><b class="k-c">${f1(p.c)}</b><span>углев.</span></div></div>
-        <p class="rule-hint info-line">Обычная порция: ${amountText(p, p.d || 100)}${p.hint ? ' · ' + esc(p.hint) : ''}${p.norand ? ' · в случайное меню не попадает' : ''}</p>
+        ${p.pw ? `<p class="rule-hint info-line num">1 шт = ${f0(p.pw)} г: ${f0(perUnit(p).k)} ккал · белок ${f1(Math.round(perUnit(p).p * 10) / 10)} г</p>` : ''}
+        <p class="rule-hint info-line">Обычная порция: ${amountText(p, p.d || 100)} · ${f0(nutr(p.id, p.d || 100).k)} ккал${p.hint ? ' · ' + esc(p.hint) : ''}${p.norand ? ' · в случайное меню не попадает' : ''}</p>
         ${p.custom
           ? `<div class="sh-actions"><button class="ghost danger-ghost" data-act="np-del" data-pid="${p.id}">Удалить</button><button class="primary" data-act="np-edit" data-pid="${p.id}">Изменить</button></div>`
           : `<button class="ghost wide" data-act="close">Закрыть</button>`}`;
@@ -902,7 +952,10 @@ function productForm(pid) {
   openSheet({
     draw(el) {
       const g0 = ed ? ed.g : (prodCat !== 'mine' ? prodCat : 'meat');
-      const num = (id, label, v) => `<label class="fld"><span>${label}</span><input id="${id}" inputmode="decimal" autocomplete="off" value="${v == null ? '' : v}"></label>`;
+      const num = (id, label, v, wrap) => `<label class="fld"${wrap ? ` id="${wrap}"` : ''}><span>${label}</span><input id="${id}" inputmode="decimal" autocomplete="off" value="${v == null ? '' : v}"></label>`;
+      // старый штучный продукт без веса штуки: его значения были «на 1 шт» — это то же, что «на 100 г» при штуке 100 г
+      const legacyPc = ed && ed.u === 'pc' && !ed.pw;
+      const pw0 = ed ? (ed.pw || (legacyPc ? 100 : '')) : '';
       el.innerHTML = `<div class="sw-head"><span class="eyebrow">${ed ? 'Изменить' : 'Свой продукт'}</span><h3 class="sh-h">${ed ? esc(ed.n) : 'Новый продукт'}</h3></div>
         <form id="pform" class="form" novalidate>
           <label class="fld"><span>Название</span><input id="pf-name" maxlength="60" autocomplete="off" value="${ed ? esc(ed.n) : ''}" placeholder="Например, творожный сыр"></label>
@@ -911,16 +964,35 @@ function productForm(pid) {
             <label class="fld" id="pf-sg-wrap"><span>Подгруппа</span><select id="pf-sg"></select></label>
           </div>
           <p class="rule-hint form-hint" id="pf-role"></p>
-          <div class="frow">
-            <label class="fld"><span>Значения указаны</span><select id="pf-u"><option value="g">на 100 г</option><option value="ml">на 100 мл</option><option value="pc">на 1 шт</option></select></label>
-            ${num('pf-d', '<span id="pf-d-label">Обычная порция, г</span>', ed ? ed.d : '')}
-          </div>
+          <div class="fhead"><span>Пищевая ценность на</span><select id="pf-base" class="mini" aria-label="Значения указаны на"><option value="g">100 г</option><option value="ml">100 мл</option></select><span class="fhead-note">как на этикетке</span></div>
           <div class="frow4">${num('pf-k', 'ккал', ed && ed.k)}${num('pf-p', 'Белки', ed && ed.p)}${num('pf-f', 'Жиры', ed && ed.f)}${num('pf-c', 'Углев.', ed && ed.c)}</div>
+          <div class="frow">
+            <label class="fld"><span>Порцию считать</span><select id="pf-mode"><option value="w">в граммах</option><option value="pc">в штуках</option></select></label>
+            ${num('pf-pw', 'Вес 1 шт, г', pw0, 'pf-pw-wrap')}
+          </div>
+          ${num('pf-d', '<span id="pf-d-label">Обычная порция, г</span>', ed ? ed.d : '')}
+          <p class="rule-hint form-hint num" id="pf-prev"></p>
           <label class="check"><input type="checkbox" id="pf-rand" ${ed && ed.norand ? '' : 'checked'}><span>Предлагать в случайном меню и советах</span></label>
           <button class="primary" type="submit">${ed ? 'Сохранить' : 'Добавить'}</button>
         </form>`;
-      const gSel = el.querySelector('#pf-g'), sgSel = el.querySelector('#pf-sg'), uSel = el.querySelector('#pf-u');
-      if (ed) uSel.value = ed.u;
+      const gSel = el.querySelector('#pf-g'), sgSel = el.querySelector('#pf-sg');
+      const bSel = el.querySelector('#pf-base'), mSel = el.querySelector('#pf-mode');
+      if (ed) { bSel.value = ed.u === 'ml' || ed.b === 'ml' ? 'ml' : 'g'; mSel.value = ed.u === 'pc' ? 'pc' : 'w'; }
+      const val = id => parseFloat(String(el.querySelector(id).value).replace(',', '.'));
+      // живой расчёт порции из значений на 100 г
+      const prev = () => {
+        const pc = mSel.value === 'pc', unit = bSel.value === 'ml' ? 'мл' : 'г';
+        el.querySelector('#pf-pw-wrap').hidden = !pc;
+        el.querySelector('#pf-d-label').textContent = 'Обычная порция, ' + (pc ? 'шт' : unit);
+        const k = val('#pf-k'), p = val('#pf-p'), pw = val('#pf-pw');
+        let d = val('#pf-d'); if (!(d > 0)) d = pc ? 1 : 100;
+        const grams = pc ? d * pw : d;
+        el.querySelector('#pf-prev').textContent = isFinite(k) && grams > 0
+          ? `Порция ${pc ? f1(d) + ' шт · ' : ''}${f0(grams)} ${unit}: ${f0(k * grams / 100)} ккал${isFinite(p) ? ' · белок ' + f1(Math.round(p * grams / 10) / 10) + ' г' : ''}`
+          : pc ? 'Укажите вес одной штуки — порция посчитается сама' : '';
+      };
+      el.querySelector('#pform').addEventListener('input', prev);
+      el.querySelector('#pform').addEventListener('change', prev);
       const sync = keepSg => {
         const g = gSel.value, subs = CAT_SG[g] || [];
         el.querySelector('#pf-sg-wrap').hidden = !subs.length;
@@ -928,12 +1000,11 @@ function productForm(pid) {
         sgSel.innerHTML = subs.map(s => `<option value="${s}" ${s === keep ? 'selected' : ''}>${SGNAME[s]}</option>`).join('');
         const role = subs.length ? SG_ROLE[sgSel.value] : CAT_ROLE[g];
         el.querySelector('#pf-role').textContent = role ? 'В случайном меню: ' + role + '. Заменять можно на продукты из этой же категории.' : 'В случайное меню сам не попадает — добавляйте через «Добавить продукт» или замену.';
-        el.querySelector('#pf-d-label').textContent = 'Обычная порция, ' + (uSel.value === 'pc' ? 'шт' : uSel.value === 'ml' ? 'мл' : 'г');
       };
       gSel.addEventListener('change', () => sync(''));
       sgSel.addEventListener('change', () => sync(sgSel.value));
-      uSel.addEventListener('change', () => sync(sgSel.value));
       sync(ed && ed.g === g0 ? ed.sg : '');
+      prev();
       el.querySelector('#pform').addEventListener('submit', e => { e.preventDefault(); saveProduct(ed, el); });
       if (!ed) setTimeout(() => el.querySelector('#pf-name').focus(), 60);
     },
@@ -947,14 +1018,18 @@ function saveProduct(ed, el) {
   if ([k, p, f, c].some(x => !isFinite(x) || x < 0)) { toast('Заполните ккал, белки, жиры и углеводы — числами, можно 0'); return; }
   const g = el.querySelector('#pf-g').value, subs = CAT_SG[g] || [];
   const sg = subs.length ? el.querySelector('#pf-sg').value : undefined;
-  const u = el.querySelector('#pf-u').value;
-  let d = v('#pf-d'); if (!isFinite(d) || d <= 0) d = u === 'pc' ? 1 : 100;
+  // значения всегда на 100 г (или 100 мл); штучный продукт хранит вес штуки pw — порция считается из него
+  const base = el.querySelector('#pf-base').value, pc = el.querySelector('#pf-mode').value === 'pc';
+  const pw = pc ? v('#pf-pw') : undefined;
+  if (pc && !(pw > 0)) { toast('Укажите вес одной штуки в граммах'); return; }
+  const u = pc ? 'pc' : base;
+  let d = v('#pf-d'); if (!isFinite(d) || d <= 0) d = pc ? 1 : 100;
   const data = {
-    n, g, sg, k, p, f, c, u, d, custom: 1,
-    st: u === 'pc' ? (d % 1 ? 0.5 : 1) : d < 50 ? 5 : 10,
+    n, g, sg, k, p, f, c, u, d, pw, b: pc ? base : undefined, custom: 1,
+    st: pc ? (d % 1 ? 0.5 : 1) : d < 50 ? 5 : 10,
     q: g === 'meat' || g === 'fish' ? 'сыр.' : sg === 'grain' ? 'сух.' : undefined,
     dry: sg === 'grain' ? 1 : undefined,
-    fatty: PROTEIN_G.has(g) && u !== 'pc' && f >= 6 ? 1 : undefined,
+    fatty: PROTEIN_G.has(g) && f >= 6 ? 1 : undefined,
     oil: sg === 'oil' ? 1 : undefined,
     norand: el.querySelector('#pf-rand').checked ? undefined : 1,
     hint: undefined,
@@ -997,53 +1072,70 @@ function openSheet(build) {
 }
 function closeSheet() { sheetState = null; $sheet.hidden = true; $sheet.innerHTML = ''; }
 
-function amountSheet(itemId) {
+// окно количества: 'plan' — сколько запланировано, 'fact' — сколько съедено на самом деле
+function amountSheet(itemId, mode = 'plan') {
+  const isFact = mode === 'fact';
+  const cur = it => (isFact ? eatAmt(it) : it.a);
   const st = {
+    mode, itemId,
     draw(el) {
       const d = getDay(view.date), f = findItem(d, itemId);
       if (!f) return closeSheet();
-      const p = prod(f.it.p);
-      const presets = p.u === 'pc'
-        ? (p.st < 1 ? [0.5, 1, 1.5, 2] : [1, 2, 3, 4, 5])
-        : [...new Set([0.5, 0.75, 1, 1.25, 1.5].map(m => roundStep(p.id, p.d * m)))];
-      el.innerHTML = `<h3 class="sh-h">${esc(p.n)}</h3><p class="sh-sub">${MEALS.find(m => m[0] === f.mk)[1]}${p.q ? ' · вес ' + (p.q === 'сух.' ? 'сухой' : 'сырой') : ''}</p>
+      const p = prod(f.it.p), base = isFact ? f.it.a : (p.d || 100);
+      st.planA = f.it.a;
+      st.presets = isFact
+        ? [...new Set([0.5, 0.75, 1, 1.25].map(m => roundStep(p.id, base * m)))]
+        : p.u === 'pc' ? (p.st < 1 ? [0.5, 1, 1.5, 2] : [1, 2, 3, 4, 5]) : [...new Set([0.5, 0.75, 1, 1.25, 1.5].map(m => roundStep(p.id, base * m)))];
+      const meal = MEALS.find(m => m[0] === f.mk)[1];
+      const sub = isFact ? 'По плану ' + amountText(p, f.it.a) : p.q ? 'Вес ' + (p.q === 'сух.' ? 'сухой' : 'сырой') : 'Сколько запланировать';
+      el.innerHTML = `<div class="sw-head"><span class="eyebrow">${isFact ? 'Сколько съели' : meal}</span><h3 class="sh-h">${esc(p.n)}</h3><p class="sh-sub num">${sub}</p></div>
         <div class="readout">
           <button class="rbtn" data-act="amt-step" data-d="-1" aria-label="Меньше">−</button>
-          <div class="scale"><input id="amt" type="number" inputmode="decimal" step="${p.st}" min="0" value="${f.it.a}" aria-label="Количество"><small>${unitLabel(p)}${p.q ? ' ' + p.q : ''}</small></div>
+          <div class="scale"><input id="amt" type="number" inputmode="decimal" step="${p.st}" min="0" value="${cur(f.it)}" aria-label="Количество"><small id="amt-unit">${unitLabel(p)}${p.q ? ' ' + p.q : ''}</small></div>
           <button class="rbtn" data-act="amt-step" data-d="1" aria-label="Больше">+</button>
         </div>
         ${p.hint ? `<p class="hint">${esc(p.hint)}</p>` : ''}
         <div class="chips" id="amt-chips"></div>
         <div class="nline num" id="amt-n"></div>
-        <div class="sh-actions"><button class="ghost" data-act="del-item">Удалить</button><button class="primary" data-act="close">Готово</button></div>`;
-      st.presets = presets;
+        ${isFact ? '' : '<div id="amt-fact"></div>'}
+        <div class="sh-actions">${isFact ? '<button class="ghost" data-act="fact-none">Не ел</button><button class="primary" data-act="fact-ok">Готово</button>' : '<button class="ghost" data-act="del-item">Удалить</button><button class="primary" data-act="close">Готово</button>'}</div>`;
       st.refresh();
       const inp = el.querySelector('#amt');
       inp.addEventListener('input', () => {
         const v = parseFloat(String(inp.value).replace(',', '.'));
-        if (isFinite(v) && v >= 0) setAmount(v);
+        if (isFinite(v) && v >= 0) setQty(v);
       });
     },
     refresh() {
       const el = document.getElementById('sheet-body'); if (!el) return;
-      const d = getDay(view.date), f = findItem(d, itemId);
+      const f = findItem(getDay(view.date), itemId);
       if (!f) return;
-      const p = prod(f.it.p), n = nutr(f.it.p, f.it.a);
+      const p = prod(f.it.p), v = cur(f.it), n = nutr(f.it.p, v);
       const inp = el.querySelector('#amt');
-      if (inp && document.activeElement !== inp) inp.value = f.it.a;
-      const presets = st.presets || [];
+      if (inp && document.activeElement !== inp) inp.value = v;
+      const u = el.querySelector('#amt-unit');
+      if (u) u.textContent = unitLabel(p) + (p.q ? ' ' + p.q : '') + (p.pw ? ` · ${f0(v * p.pw)} г` : '');
       const chips = el.querySelector('#amt-chips');
-      if (chips) chips.innerHTML = presets.map(v => `<button class="chip num" data-act="amt-set" data-v="${v}" aria-pressed="${v === f.it.a}">${f1(v)} ${unitLabel(p)}</button>`).join('');
+      if (chips) chips.innerHTML = (st.presets || []).map(x => `<button class="chip num" data-act="amt-set" data-v="${x}" aria-pressed="${x === v}">${isFact && x === st.planA ? 'по плану' : f1(x) + ' ' + unitLabel(p)}</button>`).join('');
       const nl = el.querySelector('#amt-n');
       if (nl) nl.innerHTML = `<div><b>${f0(n.k)}</b><span>ккал</span></div><div><b class="k-p">${f1(Math.round(n.p * 10) / 10)}</b><span>белки</span></div><div><b class="k-f">${f1(Math.round(n.f * 10) / 10)}</b><span>жиры</span></div><div><b class="k-c">${f1(Math.round(n.c * 10) / 10)}</b><span>углев.</span></div>`;
+      const fr = el.querySelector('#amt-fact');
+      if (fr) fr.innerHTML = f.it.done
+        ? `<button class="fact-row" data-act="fact" data-id="${f.it.id}"><span>Съедено: <b>${f.it.fact != null ? amountText(p, f.it.fact) : 'по плану'}</b></span><span class="linkbtn">Изменить</span></button>`
+        : `<button class="fact-row" data-act="fact" data-id="${f.it.id}"><span>Уже съели? Отметьте сколько</span><span class="linkbtn">Отметить</span></button>`;
     },
   };
-  st.itemId = itemId;
   openSheet(st);
 }
-function setAmount(v) {
-  const id = sheetState && sheetState.itemId; if (!id) return;
-  mutate(d => { const f = findItem(d, id); if (f) f.it.a = Math.round(v * 100) / 100; });
+// меняет то, что открыто в окне количества: план или факт
+function setQty(v) {
+  const st = sheetState; if (!st || !st.itemId) return;
+  v = Math.round(v * 100) / 100;
+  mutate(d => {
+    const f = findItem(d, st.itemId); if (!f) return;
+    if (st.mode === 'fact') { f.it.done = true; if (v === f.it.a) delete f.it.fact; else f.it.fact = v; }
+    else f.it.a = v;
+  });
 }
 
 // с какой категории открыть «Добавить»: для перекусов — перекусы, для основных приёмов — чего в приёме ещё нет
@@ -1060,7 +1152,8 @@ function addSheet(mk) {
   const recCache = {}; // рекомендации не перетасовываются при каждом нажатии
   const st = {
     draw(el) {
-      el.innerHTML = `<div class="sw-head"><span class="eyebrow">Добавить</span><h3 class="sh-h">${MEALS.find(m => m[0] === mk)[1]}</h3></div>
+      const left = S.targets.k - dayTotals(getDay(view.date)).t.k;
+      el.innerHTML = `<div class="sw-head"><span class="eyebrow">Добавить</span><h3 class="sh-h">${MEALS.find(m => m[0] === mk)[1]}</h3><p class="sh-sub num">${left > 0 ? `До цели дня ещё ${f0(left)} ккал — порции подобраны так, чтобы в них уложиться` : `День уже на ${f0(-left)} ккал выше цели`}</p></div>
         <div class="gchips" id="add-g"></div>
         <input class="search" id="add-q" type="search" placeholder="Поиск в категории" autocomplete="off">
         <div id="add-list"></div>`;
@@ -1081,8 +1174,8 @@ function addSheet(mk) {
       }
       const lu = lastUsed(view.date), inDay = idsInDay(getDay(view.date));
       const rec = q ? [] : (recCache[g] || (recCache[g] = recommend(g, view.date, null, 2)));
-      const card = p => `<button class="sg-card" data-act="pick" data-pid="${p.id}"><span class="sg-main"><b>${esc(p.n)}</b><span class="num">${amountText(p, p.d || 100)} · ${whyText(lu, p.id, view.date)}</span></span><span class="pill num">${f0(nutr(p.id, p.d || 100).k)} ккал</span></button>`;
-      const row = p => `<button class="lrow ${inDay.has(p.id) ? 'dim' : ''}" data-act="pick" data-pid="${p.id}"><span class="ln">${esc(p.n)}</span><span class="la num">${amountText(p, p.d || 100)}</span><span class="ld num">${f0(nutr(p.id, p.d || 100).k)}</span></button>`;
+      const card = p => { const a = addAmount(p); return `<button class="sg-card" data-act="pick" data-pid="${p.id}"><span class="sg-main"><b>${esc(p.n)}</b><span class="num">${amountText(p, a)} · ${whyText(lu, p.id, view.date)}</span></span><span class="pill num">${f0(nutr(p.id, a).k)} ккал</span></button>`; };
+      const row = p => { const a = addAmount(p); return `<button class="lrow ${inDay.has(p.id) ? 'dim' : ''}" data-act="pick" data-pid="${p.id}"><span class="ln">${esc(p.n)}</span><span class="la num">${amountText(p, a)}</span><span class="ld num">${f0(nutr(p.id, a).k)}</span></button>`; };
       const rest = list.filter(p => !rec.includes(p.id));
       box.innerHTML = (rec.length ? `<div class="sec-h">Советуем</div><div class="sugg">${rec.map(id => card(prod(id))).join('')}</div>` : '')
         + `<div class="list-h"><span>${q ? 'Найдено' : 'Все в категории'}</span><span>ккал</span></div>`
@@ -1099,7 +1192,8 @@ function swapOptions(it) {
   const key = view.date, p = prod(it.p), out = [], lu = lastUsed(key), inDay = idsInDay(getDay(key));
   const has = id => out.some(o => o.items[0][0] === id);
   const opt = (sec, id, a, extra) => ({ sec, sg: prod(id).sg || '', items: [[id, a]], today: inDay.has(id), ...extra });
-  for (const id of recommend(p.g, key, it.p, 3, p.sg, it)) out.push(opt('rec', id, equivAmount(it.p, it.a, id), { why: whyText(lu, id, key) }));
+  const room = slotRoom(getDay(key), it); // порции не выводят день за цель по калориям
+  for (const id of recommend(p.g, key, it.p, 3, p.sg, it)) out.push(opt('rec', id, fitAmount(it, id, room), { why: whyText(lu, id, key) }));
   const sw = SWAPS[it.p];
   if (sw) {
     const r = it.a / sw.base;
@@ -1112,7 +1206,7 @@ function swapOptions(it) {
   }
   for (const x of allProducts()) {
     if (x.id === it.p || x.g !== p.g || has(x.id)) continue;
-    out.push(opt('rule', x.id, equivAmount(it.p, it.a, x.id)));
+    out.push(opt('rule', x.id, fitAmount(it, x.id, room)));
   }
   return out;
 }
@@ -1123,10 +1217,11 @@ function kDiff(dk) {
   return [dk > 60 ? 'more' : 'ok', (dk > 0 ? '+' : '−') + f0(a) + ' ккал', (dk > 0 ? '+' : '−') + f0(a)];
 }
 function ruleHint(p, cur) {
-  if (PROTEIN_G.has(p.g)) return `Порции подобраны на те же ${f0(cur.p)} г белка`;
-  if (p.dry) return 'Крупы — тот же сухой вес, остальное — те же калории';
+  const tail = ', но так, чтобы день не вышел за цель по калориям';
+  if (PROTEIN_G.has(p.g)) return `Порции — на те же ${f0(cur.p)} г белка` + tail;
+  if (p.dry) return 'Крупы — тот же сухой вес, остальное — те же калории' + tail;
   if (p.g === 'veg') return 'Порции — тот же вес';
-  return `Порции подобраны на те же ${f0(cur.k)} ккал`;
+  return `Порции — на те же ${f0(cur.k)} ккал` + tail;
 }
 function swapSheet(itemId) {
   let open = false;
@@ -1134,7 +1229,7 @@ function swapSheet(itemId) {
     draw(el) {
       const d = getDay(view.date), f = findItem(d, itemId);
       if (!f) return closeSheet();
-      const p = prod(f.it.p), cur = nutr(f.it.p, f.it.a);
+      const p = prod(f.it.p), cur = itemN(f.it);
       const opts = st.opts || (st.opts = swapOptions(f.it)); // один раз: рекомендации не прыгают при раскрытии списка
       const idx = opts.map((o, i) => [o, i]);
       const top = [...idx.filter(([o]) => o.sec === 'plan').slice(0, 1), ...idx.filter(([o]) => o.sec === 'rec')].slice(0, 3);
@@ -1145,7 +1240,10 @@ function swapSheet(itemId) {
       const card = ([o, i]) => {
         const x = prod(o.items[0][0]), [cls, txt] = kDiff(dkOf(o));
         const why = o.sec === 'plan' ? 'по плану' : o.why;
-        return `<button class="sg-card" data-act="do-swap" data-i="${i}"><span class="sg-main"><b>${esc(o.note || x.n)}</b><span class="num">${amountText(x, o.items[0][1])}${why ? ' · ' + why : ''}</span></span><span class="pill num ${cls}">${txt}</span></button>`;
+        // честно показываем, если ради калорий пришлось урезать белок
+        const pShort = PROTEIN_G.has(p.g) ? cur.p - nutr(o.items[0][0], o.items[0][1]).p : 0;
+        const warn = pShort >= 5 ? ` · <span class="warn-t">белка меньше на ${f0(pShort)} г</span>` : '';
+        return `<button class="sg-card" data-act="do-swap" data-i="${i}"><span class="sg-main"><b>${esc(o.note || x.n)}</b><span class="num">${amountText(x, o.items[0][1])}${why ? ' · ' + why : ''}${warn}</span></span><span class="pill num ${cls}">${txt}</span></button>`;
       };
       const row = ([o, i]) => {
         const x = prod(o.items[0][0]), [cls, , short] = kDiff(dkOf(o));
@@ -1173,7 +1271,7 @@ function doSwap(i) {
     if (prod(pid).fatty && !wasFatty && f.arr.some(x => prod(x.p) && prod(x.p).oil)) oilMeal = f.mk;
   }, true);
   closeSheet();
-  if (oilMeal) toast(`${prod(pid).n} жирнее — масло в этом приёме можно не добавлять`, true, { label: 'Убрать масло', meal: oilMeal });
+  if (oilMeal) toast(`${prod(pid).n} жирнее — масло в этом приёме можно не добавлять`, true, { label: 'Убрать масло', act: 'drop-oil', data: { meal: oilMeal } });
   else toast('Заменено', true);
 }
 
@@ -1198,7 +1296,8 @@ function dayMenu() {
 /* ---------- тост ---------- */
 let tTimer;
 function toast(text, withUndo, action) {
-  $toast.innerHTML = `<span>${esc(text)}</span>${action ? `<button data-act="drop-oil" data-meal="${action.meal}">${esc(action.label)}</button>` : ''}${withUndo && undoStack.length ? '<button data-act="undo">Вернуть</button>' : ''}`;
+  const attrs = action ? Object.entries(action.data || {}).map(([k, v]) => ` data-${k}="${esc(v)}"`).join('') : '';
+  $toast.innerHTML = `<span>${esc(text)}</span>${action ? `<button data-act="${action.act}"${attrs}>${esc(action.label)}</button>` : ''}${withUndo && undoStack.length ? '<button data-act="undo">Вернуть</button>' : ''}`;
   $toast.hidden = false;
   clearTimeout(tTimer);
   tTimer = setTimeout(hideToast, action ? 8000 : 4500);
@@ -1214,7 +1313,17 @@ document.addEventListener('click', e => {
     case 'prev': view.date = clampDate(shiftKey(view.date, -1)); render(); break;
     case 'next': view.date = clampDate(shiftKey(view.date, 1)); render(); break;
     case 'today': view.date = todayKey(); render(); break;
-    case 'toggle': mutate(d => { const f = findItem(d, b.dataset.id); if (f) f.it.done = !f.it.done; }); break;
+    case 'toggle': {
+      // одно касание — «съедено по плану»; сколько на самом деле — по кнопке в подсказке или нажатием на продукт
+      const id = b.dataset.id; let nowDone = false;
+      mutate(d => { const f = findItem(d, id); if (!f) return; f.it.done = !f.it.done; delete f.it.fact; nowDone = f.it.done; });
+      if (nowDone) toast('Съедено по плану', false, { label: 'Съел другое количество', act: 'fact', data: { id } });
+      else hideToast();
+      break;
+    }
+    case 'fact': hideToast(); amountSheet(b.dataset.id, 'fact'); break;
+    case 'fact-ok': { const id = sheetState.itemId; mutate(d => { const f = findItem(d, id); if (f) f.it.done = true; }); closeSheet(); break; }
+    case 'fact-none': { const id = sheetState.itemId; mutate(d => { const f = findItem(d, id); if (f) { f.it.done = false; delete f.it.fact; } }); closeSheet(); toast('Отметка снята'); break; }
     case 'amount': amountSheet(b.dataset.id); break;
     case 'swap': swapSheet(b.dataset.id); break;
     case 'do-swap': doSwap(+b.dataset.i); break;
@@ -1223,15 +1332,15 @@ document.addEventListener('click', e => {
     case 'add-g': sheetState && sheetState.setG && sheetState.setG(b.dataset.g); break;
     case 'pick': {
       const mk = sheetState.mk, p = prod(b.dataset.pid), id = uid();
-      mutate(d => { (d.meals[mk] = d.meals[mk] || []).push({ id, p: p.id, a: p.d || 100, done: false }); });
+      mutate(d => { (d.meals[mk] = d.meals[mk] || []).push({ id, p: p.id, a: addAmount(p), done: false }); });
       amountSheet(id); break;
     }
     case 'amt-step': {
       const f = findItem(getDay(view.date), sheetState.itemId); if (!f) break;
-      const p = prod(f.it.p);
-      setAmount(Math.max(0, Math.round((f.it.a + p.st * +b.dataset.d) * 100) / 100)); break;
+      const p = prod(f.it.p), now = sheetState.mode === 'fact' ? eatAmt(f.it) : f.it.a;
+      setQty(Math.max(0, now + p.st * +b.dataset.d)); break;
     }
-    case 'amt-set': setAmount(+b.dataset.v); break;
+    case 'amt-set': setQty(+b.dataset.v); break;
     case 'del-item': {
       const id = sheetState.itemId; let name = '';
       mutate(d => { const f = findItem(d, id); if (f) { name = prod(f.it.p).n; f.arr.splice(f.i, 1); } }, true);
@@ -1262,7 +1371,7 @@ document.addEventListener('click', e => {
       for (const [mk] of MEALS) tpl[mk] = (d.meals[mk] || []).map(x => [x.p, x.a]);
       undoStack.push(JSON.stringify(S)); S.template = tpl; commit(); closeSheet(); toast('Шаблон сохранён', true); break;
     }
-    case 'm-uncheck': mutate(d => { for (const [mk] of MEALS) for (const x of d.meals[mk] || []) x.done = false; }, true); closeSheet(); break;
+    case 'm-uncheck': mutate(d => { for (const [mk] of MEALS) for (const x of d.meals[mk] || []) { x.done = false; delete x.fact; } }, true); closeSheet(); break;
     case 'm-clear': mutate(d => { for (const [mk] of MEALS) d.meals[mk] = []; }, true); closeSheet(); toast('День очищен', true); break;
     case 'kcal': S.targets.k = Math.max(1200, S.targets.k + +b.dataset.d); commit(); break;
     case 'pg': prodCat = b.dataset.g; render(); break;

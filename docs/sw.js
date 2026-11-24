@@ -1,5 +1,5 @@
 // «Рацион дня» — офлайн-кэш. Версия ставится сборкой (tools/build.mjs).
-const VERSION = 'racion-23.11-74ab77';
+const VERSION = 'racion-24.11-2991fc';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {
