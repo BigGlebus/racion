@@ -13,7 +13,7 @@
 <link rel="icon" href="icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
-<script>window.APP_VERSION = "24.11-8109f8";</script>
+<script>window.APP_VERSION = "24.11-1e2fa4";</script>
 <title>Рацион дня</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -252,6 +252,35 @@ input, select { font: inherit; color: inherit; }
 .check { display: flex; gap: 10px; align-items: center; font-size: 14px; padding: 4px 0; }
 .check input { width: 20px; height: 20px; accent-color: var(--accent); flex: none; }
 .ghost.wide { width: 100%; }
+/* план / факт: сводка дня и таблица приёма */
+.kline .eyebrow { align-self: center; margin-right: 2px; }
+.factline { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; font-size: 13px; color: var(--muted); padding-top: 8px; border-top: 1px solid var(--line); }
+.factline b { font-family: var(--f-display); font-size: 18px; color: var(--ink); }
+.factline .fcount { margin-left: auto; font-size: 12px; }
+.factline.empty span:last-child { font-size: 12.5px; }
+.mtab { display: grid; grid-template-columns: 56px repeat(4, minmax(0, 1fr)); gap: 2px 8px; align-items: baseline; padding: 10px 12px 8px; margin: 0 2px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); text-align: right; }
+.mtab > span:first-child, .mtab .lbl { text-align: left; }
+.mtab > span:nth-child(-n+5) { font-size: 11px; letter-spacing: .02em; }
+.mtab .lbl { font-weight: 600; color: var(--ink); font-size: 13px; }
+.mtab b { color: var(--ink); font-weight: 600; }
+.mfact { width: calc(100% - 4px); border-top: 0; padding-top: 4px; border-radius: 12px; background: var(--accent-soft); margin-bottom: 4px; }
+.mfact .lbl { color: var(--accent); }
+.mfact b.over { color: var(--warn); }
+.mfact .fempty { grid-column: 2 / -1; color: var(--accent); font-weight: 600; text-align: right; }
+.mh .mk { font-size: 12.5px; }
+/* любимые */
+.heart { flex: none; width: 40px; height: 40px; display: grid; place-items: center; color: var(--muted); border-radius: 12px; }
+.heart svg { width: 20px; height: 20px; }
+.heart[aria-pressed="true"] { color: var(--bad); }
+.heart:active { background: var(--surface-2); }
+.head-row { display: flex; align-items: flex-start; gap: 8px; }
+.head-row > div { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.lrow-w { display: flex; align-items: center; border-bottom: 1px solid var(--line); }
+.lrow-w .lrow { border-bottom: 0; flex: 1; min-width: 0; }
+.plist-card .lrow-w:last-child { border-bottom: 0; }
+.favdot { color: var(--bad); font-size: 12px; margin-right: 5px; }
+.chips.move { justify-content: flex-start; margin: 4px 0 16px; }
+
 .fhead { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); margin-top: 4px; }
 .fhead .mini { padding: 6px 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); font-size: 13px; }
 .fhead-note { margin-left: auto; font-size: 12px; }
@@ -310,188 +339,487 @@ input, select { font: inherit; color: inherit; }
 
 <script>
 'use strict';
-/* ---------- справочник продуктов (на 100 г / 100 мл, или на штуку/порцию) ---------- */
-// g: категория (замены и добавление — только внутри неё); sg: подгруппа для списка; u: g|ml|pc; q: сух./сыр.;
-// st: шаг; d: порция по умолчанию; fatty: жирнее — убрать масло из приёма; dry: крупа, меняется по сухому весу; oil: масло
-const BUILTIN = [
-  // Мясо и птица — сырой вес
-  ['chicken', 'Куриная грудка', 'meat', 110, 23, 1.5, 0, { q: 'сыр.', d: 200 }],
-  ['chickmince', 'Куриный фарш', 'meat', 145, 18, 8, 0, { q: 'сыр.', d: 200, fatty: 1 }],
-  ['thigh', 'Куриное бедро без кожи', 'meat', 165, 20, 9, 0, { q: 'сыр.', d: 200, fatty: 1 }],
-  ['liver', 'Куриная печень', 'meat', 135, 19, 6, 1, { q: 'сыр.', d: 200, fatty: 1 }],
-  ['turkey', 'Филе индейки', 'meat', 115, 22, 2, 0, { q: 'сыр.', d: 200 }],
-  ['turkmince', 'Фарш из индейки', 'meat', 150, 19, 8, 0, { q: 'сыр.', d: 200, fatty: 1 }],
-  ['veal', 'Телятина', 'meat', 100, 20, 2, 0, { q: 'сыр.', d: 200 }],
-  ['beef', 'Говядина (вырезка, лопатка)', 'meat', 155, 20, 8, 0, { q: 'сыр.', d: 180, fatty: 1 }],
-  ['beefmince', 'Говяжий фарш 15%', 'meat', 215, 18, 15, 0, { q: 'сыр.', d: 150, fatty: 1 }],
-  ['pork', 'Свиная вырезка', 'meat', 140, 21, 6, 0, { q: 'сыр.', d: 180, fatty: 1 }],
-  ['rabbit', 'Кролик', 'meat', 155, 21, 8, 0, { q: 'сыр.', d: 180, fatty: 1 }],
-  // Рыба и морепродукты — сырой вес
-  ['pollock', 'Минтай', 'fish', 75, 16, 1, 0, { q: 'сыр.', d: 250 }],
-  ['hake', 'Хек', 'fish', 85, 17, 2, 0, { q: 'сыр.', d: 250 }],
-  ['cod', 'Треска', 'fish', 80, 18, 1, 0, { q: 'сыр.', d: 250 }],
-  ['pikeperch', 'Судак', 'fish', 85, 18, 1, 0, { q: 'сыр.', d: 250 }],
-  ['tilapia', 'Тилапия', 'fish', 95, 20, 2, 0, { q: 'сыр.', d: 250 }],
-  ['squid', 'Кальмар', 'fish', 100, 18, 2, 2, { q: 'сыр.', d: 250 }],
-  ['shrimp', 'Креветки очищенные', 'fish', 95, 20, 1.5, 0, { d: 200 }],
-  ['tuna', 'Тунец в собственном соку', 'fish', 100, 23, 1, 0, { d: 100, hint: 'Вес без жидкости' }],
-  ['salmon', 'Горбуша', 'fish', 140, 20, 6.5, 0, { q: 'сыр.', d: 200, fatty: 1 }],
-  ['atlsalmon', 'Сёмга / лосось', 'fish', 200, 20, 13, 0, { q: 'сыр.', d: 150, fatty: 1 }],
-  ['mackerel', 'Скумбрия', 'fish', 190, 18, 13, 0, { q: 'сыр.', d: 150, fatty: 1 }],
-  // Яйца и молочное
-  ['egg', 'Яйцо', 'dairy', 80, 6.5, 5.5, 0.4, { sg: 'eggs', u: 'pc', st: 1, d: 3, hint: '1 шт ≈ 55 г' }],
-  ['eggwhite', 'Яичный белок', 'dairy', 17, 3.6, 0.1, 0.2, { sg: 'eggs', norand: 1, u: 'pc', st: 1, d: 3, hint: 'Белок одного яйца ≈ 33 г' }],
-  ['cottage0', 'Творог 0%', 'dairy', 70, 16, 0.5, 1.5, { sg: 'curd', d: 200 }],
-  ['cottage', 'Творог 5%', 'dairy', 120, 17, 5, 2, { sg: 'curd', d: 200 }],
-  ['cottage9', 'Творог 9%', 'dairy', 160, 16, 9, 2, { sg: 'curd', d: 200, fatty: 1 }],
-  ['grainy', 'Зернёный творог 5%', 'dairy', 105, 12, 5, 2, { sg: 'curd', d: 200 }],
-  ['syrniki', 'Сырники', 'dairy', 388, 42.5, 15.7, 18.4, { sg: 'curd', u: 'pc', ul: 'порц.', st: 0.5, d: 1, hint: 'Порция: творог 5% 200 г + яйцо + мука 20 г, на сухой сковороде' }],
-  ['cheese', 'Сыр твёрдый', 'dairy', 350, 25, 27, 0, { sg: 'cheese', st: 5, d: 30, fatty: 1 }],
-  ['skyr', 'Скир', 'dairy', 65, 11, 0.2, 4, { sg: 'yog', d: 250 }],
-  ['greek', 'Греческий йогурт 2%', 'dairy', 70, 9, 2, 4, { sg: 'yog', d: 250 }],
-  ['yogurt', 'Йогурт натуральный 2,5%', 'dairy', 60, 4, 2.5, 5, { sg: 'yog', d: 250 }],
-  ['kefir', 'Кефир 1%', 'dairy', 40, 3, 1, 4, { sg: 'drink', u: 'ml', st: 50, d: 500 }],
-  ['kefir25', 'Кефир 2,5%', 'dairy', 50, 3, 2.5, 4, { sg: 'drink', u: 'ml', st: 50, d: 500 }],
-  ['ryazhenka', 'Ряженка 2,5%', 'dairy', 55, 3, 2.5, 4.2, { sg: 'drink', u: 'ml', st: 50, d: 500 }],
-  ['milk', 'Молоко 1,5%', 'dairy', 45, 3, 1.5, 4.8, { sg: 'drink', u: 'ml', st: 50, d: 250 }],
-  ['whey', 'Протеин', 'dairy', 120, 25, 1.5, 2, { sg: 'prot', u: 'pc', ul: 'порц.', st: 0.5, d: 1, hint: '1 порция = 30 г порошка' }],
-  // Гарниры
-  ['buckwheat', 'Гречка', 'garnish', 310, 12.5, 3, 62, { sg: 'grain', q: 'сух.', d: 80, dry: 1 }],
-  ['rice', 'Рис', 'garnish', 345, 7, 1, 77, { sg: 'grain', q: 'сух.', d: 80, dry: 1 }],
-  ['brownrice', 'Рис бурый', 'garnish', 335, 7.5, 2.5, 72, { sg: 'grain', q: 'сух.', d: 80, dry: 1 }],
-  ['bulgur', 'Булгур', 'garnish', 340, 12, 1.5, 70, { sg: 'grain', q: 'сух.', d: 80, dry: 1 }],
-  ['pasta', 'Макароны из твёрдых сортов', 'garnish', 345, 12, 1.5, 70, { sg: 'grain', q: 'сух.', d: 80, dry: 1 }],
-  ['wholepasta', 'Макароны цельнозерновые', 'garnish', 340, 13, 2.5, 65, { sg: 'grain', q: 'сух.', d: 80, dry: 1 }],
-  ['couscous', 'Кускус', 'garnish', 360, 12, 1, 72, { sg: 'grain', q: 'сух.', d: 80, dry: 1 }],
-  ['oats', 'Овсянка', 'garnish', 360, 12, 6, 60, { sg: 'grain', q: 'сух.', d: 40, dry: 1 }],
-  ['barley', 'Перловка', 'garnish', 320, 9, 1, 67, { sg: 'grain', q: 'сух.', d: 80, dry: 1 }],
-  ['millet', 'Пшено', 'garnish', 340, 11, 3, 67, { sg: 'grain', q: 'сух.', d: 80, dry: 1 }],
-  ['quinoa', 'Киноа', 'garnish', 365, 14, 6, 64, { sg: 'grain', q: 'сух.', d: 80, dry: 1 }],
-  ['lentil', 'Чечевица', 'garnish', 300, 24, 1.5, 50, { sg: 'grain', q: 'сух.', d: 80, dry: 1 }],
-  ['potato', 'Картофель', 'garnish', 77, 2, 0.4, 16, { sg: 'tuber', q: 'сыр.', st: 50, d: 300 }],
-  ['sweetpotato', 'Батат', 'garnish', 85, 1.6, 0.1, 20, { sg: 'tuber', q: 'сыр.', st: 50, d: 300 }],
-  ['bread', 'Хлеб', 'garnish', 250, 8, 3, 47, { sg: 'bread', st: 30, d: 60, hint: '1 кусок ≈ 30 г' }],
-  ['wholebread', 'Хлеб цельнозерновой', 'garnish', 230, 9, 3, 42, { sg: 'bread', st: 30, d: 60, hint: '1 кусок ≈ 30 г' }],
-  ['lavash', 'Лаваш тонкий', 'garnish', 275, 9, 1, 55, { sg: 'bread', d: 50 }],
-  ['flour', 'Мука пшеничная', 'garnish', 340, 10, 1, 70, { sg: 'bread', st: 5, d: 20, hidden: 1 }],
-  // Овощи
-  ['veg', 'Овощи (смесь)', 'veg', 30, 1.5, 0.2, 5, { st: 50, d: 200, hint: 'Огурцы, помидоры, капуста — что есть' }],
-  ['cucumber', 'Огурцы', 'veg', 15, 0.8, 0.1, 3, { st: 50, d: 200 }],
-  ['tomato', 'Помидоры', 'veg', 20, 1, 0.2, 4, { st: 50, d: 200 }],
-  ['cabbage', 'Капуста белокочанная', 'veg', 28, 1.8, 0.1, 5, { st: 50, d: 200 }],
-  ['broccoli', 'Брокколи', 'veg', 34, 2.8, 0.4, 7, { st: 50, d: 200 }],
-  ['cauli', 'Цветная капуста', 'veg', 30, 2.5, 0.3, 5, { st: 50, d: 200 }],
-  ['pepper', 'Перец болгарский', 'veg', 27, 1.3, 0.1, 5.3, { st: 50, d: 150 }],
-  ['zucchini', 'Кабачок', 'veg', 24, 0.6, 0.3, 4.6, { st: 50, d: 200 }],
-  ['carrot', 'Морковь', 'veg', 35, 1.3, 0.1, 7, { st: 50, d: 100 }],
-  ['beet', 'Свёкла', 'veg', 42, 1.5, 0.1, 9, { st: 50, d: 150 }],
-  ['greenbeans', 'Стручковая фасоль', 'veg', 25, 2, 0.2, 4, { st: 50, d: 200 }],
-  ['mushroom', 'Шампиньоны', 'veg', 27, 4.3, 1, 0.1, { st: 50, d: 200 }],
-  ['spinach', 'Шпинат', 'veg', 23, 2.9, 0.3, 2, { st: 50, d: 100 }],
-  ['greens', 'Листовой салат, зелень', 'veg', 15, 1.4, 0.2, 2.3, { st: 50, d: 100 }],
-  // Фрукты и ягоды
-  ['banana', 'Банан', 'fruit', 95, 1.5, 0.3, 21, { sg: 'fresh', d: 120, hint: '1 банан ≈ 120 г без кожуры' }],
-  ['apple', 'Яблоко', 'fruit', 50, 0.4, 0.4, 11, { sg: 'fresh', d: 150, hint: '1 яблоко ≈ 150 г' }],
-  ['pear', 'Груша', 'fruit', 47, 0.4, 0.3, 10.3, { sg: 'fresh', d: 150, hint: '1 груша ≈ 150 г' }],
-  ['citrus', 'Мандарин / апельсин', 'fruit', 42, 0.8, 0.2, 9, { sg: 'fresh', d: 150, hint: '2 мандарина или 1 апельсин ≈ 150 г' }],
-  ['grapefruit', 'Грейпфрут', 'fruit', 35, 0.7, 0.2, 6.5, { sg: 'fresh', d: 250, hint: '1 грейпфрут ≈ 250 г без кожуры' }],
-  ['kiwi', 'Киви', 'fruit', 48, 1, 0.4, 10, { sg: 'fresh', d: 150, hint: '2 киви ≈ 150 г' }],
-  ['persimmon', 'Хурма', 'fruit', 65, 0.5, 0.4, 15, { sg: 'fresh', d: 150 }],
-  ['grapes', 'Виноград', 'fruit', 70, 0.6, 0.2, 17, { sg: 'fresh', d: 100 }],
-  ['berries', 'Ягоды (свежие или замороженные)', 'fruit', 45, 1, 0.4, 9, { sg: 'fresh', d: 150 }],
-  ['strawberry', 'Клубника', 'fruit', 35, 0.8, 0.4, 7.5, { sg: 'fresh', d: 200 }],
-  ['dates', 'Финики', 'fruit', 280, 2.5, 0.4, 70, { sg: 'dried', st: 5, d: 25 }],
-  ['apricot', 'Курага', 'fruit', 240, 3.5, 0.4, 55, { sg: 'dried', st: 5, d: 25 }],
-  ['prunes', 'Чернослив', 'fruit', 240, 2.3, 0.7, 57, { sg: 'dried', st: 5, d: 25 }],
-  ['raisins', 'Изюм', 'fruit', 270, 3, 0.5, 66, { sg: 'dried', st: 5, d: 25 }],
-  // Перекусы
-  ['almonds', 'Миндаль', 'snack', 600, 21, 52, 13, { sg: 'nuts', st: 5, d: 30 }],
-  ['walnut', 'Грецкий орех', 'snack', 655, 15, 65, 7, { sg: 'nuts', st: 5, d: 25 }],
-  ['cashew', 'Кешью', 'snack', 600, 18, 48, 30, { sg: 'nuts', st: 5, d: 25 }],
-  ['peanut', 'Арахис', 'snack', 570, 26, 49, 10, { sg: 'nuts', st: 5, d: 30 }],
-  ['seeds', 'Семечки подсолнечника', 'snack', 600, 21, 53, 11, { sg: 'nuts', st: 5, d: 25 }],
-  ['pb', 'Арахисовая паста', 'snack', 600, 25, 50, 15, { sg: 'nuts', st: 5, d: 30 }],
-  ['crispbread', 'Хлебцы цельнозерновые', 'snack', 330, 10, 3, 60, { sg: 'crisp', st: 10, d: 30, hint: '1 хлебец ≈ 10 г' }],
-  ['protbar', 'Протеиновый батончик', 'snack', 200, 20, 7, 15, { sg: 'crisp', u: 'pc', st: 1, d: 1, hint: '1 шт ≈ 60 г — точнее по этикетке' }],
-  ['choc', 'Тёмный шоколад 70%+', 'snack', 560, 8, 40, 35, { sg: 'sweet', st: 5, d: 25 }],
-  ['marshmallow', 'Зефир / пастила', 'snack', 320, 1, 0, 79, { sg: 'sweet', st: 5, d: 35, hint: '1 зефирина ≈ 35 г' }],
-  ['honey', 'Мёд', 'snack', 320, 0.8, 0, 80, { sg: 'sweet', st: 5, d: 15, hint: '1 ч. л. ≈ 8 г' }],
-  // Масло и соусы
-  ['oil', 'Растительное масло', 'fat', 900, 0, 100, 0, { sg: 'oil', st: 5, d: 5, oil: 1, hint: '1 ч. л. ≈ 5 г' }],
-  ['olive', 'Оливковое масло', 'fat', 900, 0, 100, 0, { sg: 'oil', st: 5, d: 5, oil: 1, hint: '1 ч. л. ≈ 5 г' }],
-  ['butter', 'Сливочное масло 82%', 'fat', 750, 0.5, 82, 0.8, { sg: 'oil', st: 5, d: 10, oil: 1 }],
-  ['sourcream', 'Сметана 10%', 'fat', 115, 3, 10, 3, { sg: 'sauce', st: 5, d: 30, hint: '1 ст. л. ≈ 20 г' }],
-  ['mayo', 'Майонез лёгкий 30%', 'fat', 300, 1, 30, 6, { sg: 'sauce', st: 5, d: 15, hint: '1 ст. л. ≈ 15 г' }],
-  ['soy', 'Соевый соус', 'fat', 50, 6, 0, 6, { sg: 'sauce', st: 5, d: 15, hint: '1 ст. л. ≈ 15 г' }],
-  ['ketchup', 'Кетчуп', 'fat', 100, 1.5, 0.5, 23, { sg: 'sauce', st: 5, d: 20 }],
-].map(([id, n, g, k, p, f, c, o]) => ({ id, n, g, k, p, f, c, u: 'g', st: 10, ...o }));
+/* ---------- справочник продуктов ---------- */
+// Одна строка — один продукт: код;название;категория;подгруппа;ккал;Б;Ж;У (на 100 г или 100 мл);обычная порция;флаги;подсказка
+// флаги: raw — вес сырой, dry — крупа по сухому весу, ml — в миллилитрах, pc=N — в штуках, 1 шт = N г (значения всё равно на 100 г),
+//        ul=… — подпись единицы, st=N — шаг, oil — масло, norand — само в случайное меню не попадает
+// Значения примерные (справочные), точнее — по этикетке.
+const FOODS = `
+chicken;Куриная грудка;main;meat;110;23;1.5;0;200;raw
+thigh;Куриное бедро без кожи;main;meat;165;20;9;0;200;raw
+drumstick;Куриная голень без кожи;main;meat;130;19;6;0;200;raw
+wings;Куриные крылья;main;meat;190;19;12;0;200;raw
+chickmince;Куриный фарш;main;meat;145;18;8;0;200;raw
+turkey;Филе индейки;main;meat;115;22;2;0;200;raw
+turkthigh;Бедро индейки без кожи;main;meat;145;19;7;0;200;raw
+turkmince;Фарш из индейки;main;meat;150;19;8;0;200;raw
+veal;Телятина;main;meat;100;20;2;0;200;raw
+beef;Говядина (вырезка, лопатка);main;meat;155;20;8;0;180;raw
+beefmince5;Говяжий фарш 5%;main;meat;135;21;5;0;180;raw
+beefmince;Говяжий фарш 15%;main;meat;215;18;15;0;150;raw
+pork;Свиная вырезка;main;meat;140;21;6;0;180;raw
+porkloin;Свиная корейка;main;meat;200;19;14;0;150;raw
+porkneck;Свиная шея;main;meat;265;16;22;0;150;raw
+porkmince;Фарш свино-говяжий;main;meat;260;16;22;0;150;raw
+lamb;Баранина;main;meat;210;17;16;0;150;raw
+rabbit;Кролик;main;meat;155;21;8;0;180;raw
+duck;Утка;main;meat;310;16;28;0;150;raw,norand
+liver;Куриная печень;main;meat;135;19;6;1;200;raw
+beefliver;Говяжья печень;main;meat;125;18;4;4;200;raw
+hearts;Куриные сердечки;main;meat;160;16;10;1;200;raw
+gizzards;Куриные желудки;main;meat;115;18;4;1;200;raw
+tongue;Говяжий язык отварной;main;meat;230;16;18;0;150;norand
+ham;Ветчина;main;deli;270;14;23;1;50;norand
+chickham;Ветчина куриная;main;deli;150;15;9;2;50;norand
+doctorsk;Колбаса варёная;main;deli;260;13;22;2;50;norand
+sausages;Сосиски;main;deli;260;11;23;2;100;norand
+smoked;Колбаса сырокопчёная;main;deli;470;24;41;0;30;norand
+bacon;Бекон;main;deli;500;15;48;0;30;norand
+buzhenina;Буженина;main;deli;230;16;18;0;50;norand
+smokedbreast;Куриная грудка копчёная;main;deli;120;22;3;1;100;norand
+pollock;Минтай;main;fish;75;16;1;0;250;raw
+hake;Хек;main;fish;85;17;2;0;250;raw
+cod;Треска;main;fish;80;18;1;0;250;raw
+haddock;Пикша;main;fish;75;17;0.5;0;250;raw
+navaga;Навага;main;fish;75;16;1;0;250;raw
+flounder;Камбала;main;fish;85;16;2;0;250;raw
+pikeperch;Судак;main;fish;85;18;1;0;250;raw
+pike;Щука;main;fish;85;18;1;0;250;raw
+tilapia;Тилапия;main;fish;95;20;2;0;250;raw
+salmon;Горбуша;main;fish;140;20;6.5;0;200;raw
+keta;Кета;main;fish;125;19;5.5;0;200;raw
+trout;Форель;main;fish;140;20;6;0;180;raw
+atlsalmon;Сёмга / лосось;main;fish;200;20;13;0;150;raw
+mackerel;Скумбрия;main;fish;190;18;13;0;150;raw
+herring;Сельдь слабосолёная;main;fish;220;18;16;0;80;norand
+tunasteak;Тунец (стейк);main;fish;110;24;1;0;200;raw
+tuna;Тунец в собственном соку;main;fish;100;23;1;0;100;;Вес без жидкости
+sardine;Сардины в масле;main;fish;220;24;14;0;100;norand
+sprats;Шпроты;main;fish;360;17;32;0;50;norand
+codliver;Печень трески;main;fish;610;4;65;1;30;norand
+squid;Кальмар;main;fish;100;18;2;2;250;raw
+shrimp;Креветки очищенные;main;fish;95;20;1.5;0;200
+mussels;Мидии;main;fish;75;11;2;3;200
+crabsticks;Крабовые палочки;main;fish;90;6;1;10;100;norand
+redcaviar;Икра красная;main;fish;250;32;13;0;20;norand
+pelmeni;Пельмени;main;dish;250;12;12;24;250
+vareniki_pot;Вареники с картофелем;main;dish;150;4;3;27;250
+plov_ch;Плов с курицей;main;dish;170;9;6;20;300
+plov_pork;Плов со свининой;main;dish;220;7;11;23;300
+makflot;Макароны по-флотски;main;dish;190;10;8;20;300
+buckmeat;Гречка с мясом;main;dish;150;9;6;15;300
+chickenrice;Рис с курицей и овощами;main;dish;140;9;4;17;300
+wok;Вок с курицей и лапшой;main;dish;150;9;5;17;300
+golubtsy;Голубцы;main;dish;110;6;6;8;300
+stuffpepper;Перец фаршированный;main;dish;120;7;6;9;300
+kotl_ch;Котлеты куриные;main;dish;190;18;10;7;150
+kotl_turkey;Котлеты из индейки;main;dish;170;19;8;5;150
+kotl_beef;Котлеты говяжьи;main;dish;220;16;14;8;150
+kotl_pork;Котлеты домашние (свинина и говядина);main;dish;260;15;19;8;150
+kotl_fish;Котлеты рыбные;main;dish;150;13;6;10;150
+tefteli;Тефтели в соусе;main;dish;160;9;10;9;250
+liverpancakes;Печёночные оладьи;main;dish;180;15;9;9;200
+befstr;Бефстроганов;main;dish;200;15;14;4;200
+goulash;Гуляш из говядины;main;dish;150;13;9;4;250
+chicken_veg;Курица тушёная с овощами;main;dish;110;12;5;5;300
+chakhokh;Чахохбили;main;dish;130;13;7;4;300
+zharkoe;Жаркое с мясом и картофелем;main;dish;160;8;9;12;300
+ragu;Рагу овощное с мясом;main;dish;110;7;6;8;300
+zrazy;Зразы картофельные с мясом;main;dish;170;7;8;18;250
+chicken_baked;Курица запечённая без кожи;main;dish;165;27;6;0;200
+chicken_grill;Курица гриль;main;dish;210;20;14;0;200
+shashlik_ch;Шашлык куриный;main;dish;175;22;9;1;200
+shashlik_pork;Шашлык свиной;main;dish;290;20;23;1;200
+lula;Люля-кебаб;main;dish;250;15;20;3;200
+schnitzel;Шницель свиной;main;dish;300;20;20;10;150
+fish_baked;Рыба запечённая с овощами;main;dish;100;14;3;4;250
+salmon_baked;Сёмга запечённая;main;dish;230;25;14;0;150
+lasagna;Лазанья;main;dish;180;10;9;15;300
+carbonara;Паста карбонара;main;dish;270;11;13;27;300
+bolognese;Паста болоньезе;main;dish;160;8;6;19;300
+lagman;Лагман;main;dish;130;7;5;14;350
+manty;Манты;main;dish;230;11;12;20;250
+khinkali;Хинкали;main;dish;230;12;11;21;250
+bliny_meat;Блинчики с мясом;main;dish;220;11;12;17;200
+pizza;Пицца;main;dish;250;11;10;29;250;norand
+shawarma;Шаурма;main;dish;230;10;12;20;350;norand
+burger;Бургер;main;dish;250;13;12;24;250;norand
+rolls;Роллы;main;dish;170;6;4;27;250;norand
+sushi;Суши с рыбой;main;dish;150;7;1;28;200;norand
+cheburek;Чебурек;main;dish;290;9;17;26;150;norand
+pirozhok;Пирожок печёный с мясом;main;dish;250;10;9;32;100;norand
+nuggets;Наггетсы куриные;main;dish;290;15;18;17;150;norand
+borsch;Борщ;main;soup;55;3;3;5;300
+shchi;Щи;main;soup;35;2;2;3;300
+chickennoodle;Суп куриный с лапшой;main;soup;45;3;1.5;5;300
+meatballsoup;Суп с фрикадельками;main;soup;50;3;2.5;4;300
+pea;Суп гороховый;main;soup;65;4;2;8;300
+lentilsoup;Суп чечевичный;main;soup;60;4;1.5;8;300
+solyanka;Солянка мясная;main;soup;70;5;5;2;300
+ukha;Уха;main;soup;45;5;1.5;3;300
+rassolnik;Рассольник;main;soup;45;2;2;5;300
+mushroomsoup;Суп грибной;main;soup;35;1.5;1.5;4;300
+cheesesoup;Суп сырный;main;soup;65;3;4;5;300
+creamsoup;Крем-суп грибной;main;soup;75;2;5;6;300
+kharcho;Харчо;main;soup;70;4;3;7;300
+tomyam;Том ям;main;soup;45;4;2;3;300
+okroshka;Окрошка на кефире;main;soup;55;3;3;4;300
+broth;Бульон куриный;main;soup;20;2;1;0;300
+buckwheat;Гречка;garnish;grain;310;12.5;3;62;80;dry
+rice;Рис;garnish;grain;345;7;1;77;80;dry
+basmati;Рис басмати;garnish;grain;350;8;0.5;78;80;dry
+jasmine;Рис жасмин;garnish;grain;355;7;0.5;79;80;dry
+brownrice;Рис бурый;garnish;grain;335;7.5;2.5;72;80;dry
+bulgur;Булгур;garnish;grain;340;12;1.5;70;80;dry
+couscous;Кускус;garnish;grain;360;12;1;72;80;dry
+pasta;Макароны из твёрдых сортов;garnish;grain;345;12;1.5;70;80;dry
+wholepasta;Макароны цельнозерновые;garnish;grain;340;13;2.5;65;80;dry
+spaghetti;Спагетти;garnish;grain;350;12;1.5;71;80;dry
+eggnoodle;Лапша яичная;garnish;grain;350;13;2.5;69;80;dry
+soba;Лапша гречневая (соба);garnish;grain;335;14;1;70;80;dry
+ricenoodle;Рисовая лапша;garnish;grain;360;6;0.5;82;80;dry
+oats;Овсянка (хлопья);garnish;grain;360;12;6;60;40;dry
+barley;Перловка;garnish;grain;320;9;1;67;80;dry
+yachka;Ячневая крупа;garnish;grain;315;10;1.3;66;80;dry
+millet;Пшено;garnish;grain;340;11;3;67;80;dry
+corngrits;Кукурузная крупа;garnish;grain;330;8;1.2;71;80;dry
+spelt;Полба;garnish;grain;340;14;2.5;68;80;dry
+quinoa;Киноа;garnish;grain;365;14;6;64;80;dry
+lentil;Чечевица;garnish;grain;300;24;1.5;50;80;dry
+chickpea;Нут;garnish;grain;360;19;6;61;80;dry
+beans_dry;Фасоль красная сухая;garnish;grain;300;21;1.5;54;80;dry
+peas_dry;Горох колотый;garnish;grain;300;21;2;50;80;dry
+mung;Маш;garnish;grain;300;23;1.5;46;80;dry
+semolina;Манная крупа;garnish;grain;330;10;1;71;50;dry,norand
+potato;Картофель;garnish;tuber;77;2;0.4;16;300;raw
+youngpot;Картофель молодой;garnish;tuber;60;2.4;0.4;12;300;raw
+sweetpotato;Батат;garnish;tuber;85;1.6;0.1;20;300;raw
+mashed;Пюре картофельное (с молоком и маслом);garnish;tuber;105;2.5;4;15;250
+fries;Картофель фри;garnish;tuber;310;3.5;15;40;150;norand
+draniki;Драники;garnish;tuber;200;4;11;22;150;norand
+bread;Хлеб пшеничный;garnish;bread;250;8;3;47;60;st=30;1 кусок ≈ 30 г
+wholebread;Хлеб цельнозерновой;garnish;bread;230;9;3;42;60;st=30;1 кусок ≈ 30 г
+rye;Хлеб ржаной;garnish;bread;210;6.5;1.2;40;60;st=30;1 кусок ≈ 30 г
+borodinsky;Хлеб бородинский;garnish;bread;210;7;1.3;41;60;st=30;1 кусок ≈ 30 г
+baton;Батон;garnish;bread;260;7.5;3;51;60;st=30;1 кусок ≈ 30 г
+baguette;Багет;garnish;bread;260;8;1.5;52;60
+lavash;Лаваш тонкий;garnish;bread;275;9;1;55;50
+tortilla;Тортилья пшеничная;garnish;bread;300;8;7;50;60;;1 шт ≈ 60 г
+pita;Пита;garnish;bread;275;9;1.2;55;60
+bun;Булочка;garnish;bread;300;8;6;52;60;norand
+flour;Мука пшеничная;garnish;bread;340;10;1;70;20;st=5,hidden
+veg;Овощи (смесь);veg;fresh;30;1.5;0.2;5;200;;Огурцы, помидоры, капуста — что есть
+cucumber;Огурцы;veg;fresh;15;0.8;0.1;3;200
+tomato;Помидоры;veg;fresh;20;1;0.2;4;200
+cherry;Помидоры черри;veg;fresh;18;0.8;0.2;3;150
+cabbage;Капуста белокочанная;veg;fresh;28;1.8;0.1;5;200
+napa;Пекинская капуста;veg;fresh;16;1.2;0.2;2;200
+broccoli;Брокколи;veg;fresh;34;2.8;0.4;7;200
+cauli;Цветная капуста;veg;fresh;30;2.5;0.3;5;200
+brussels;Брюссельская капуста;veg;fresh;43;4.8;0.3;5;200
+pepper;Перец болгарский;veg;fresh;27;1.3;0.1;5.3;150
+zucchini;Кабачок;veg;fresh;24;0.6;0.3;4.6;200
+eggplant;Баклажан;veg;fresh;25;1.2;0.1;4.5;200
+pumpkin;Тыква;veg;fresh;28;1;0.1;5.8;200
+carrot;Морковь;veg;fresh;35;1.3;0.1;7;100
+beet;Свёкла;veg;fresh;42;1.5;0.1;9;150
+radish;Редис;veg;fresh;20;1.2;0.1;3.4;100
+onion;Лук репчатый;veg;fresh;41;1.4;0;8.2;50
+greenbeans;Стручковая фасоль;veg;fresh;25;2;0.2;4;200
+asparagus;Спаржа;veg;fresh;20;2.2;0.1;3;150
+mushroom;Шампиньоны;veg;fresh;27;4.3;1;0.1;200
+spinach;Шпинат;veg;fresh;23;2.9;0.3;2;100
+greens;Листовой салат, зелень;veg;fresh;15;1.4;0.2;2.3;100
+arugula;Руккола;veg;fresh;25;2.6;0.7;2;50
+celery;Сельдерей стебель;veg;fresh;13;0.9;0.1;2;100
+vegfrozen;Овощная смесь замороженная;veg;fresh;35;2;0.3;6;200
+peas_green;Горошек зелёный (консервы);veg;fresh;55;3.6;0.1;10;100
+corn;Кукуруза консервированная;veg;fresh;85;2.6;1;16;100
+pickled;Огурцы солёные;veg;fresh;13;0.8;0.1;2;100
+sauerkraut;Капуста квашеная;veg;fresh;20;1.5;0.1;3;150
+seaweed;Морская капуста;veg;fresh;25;0.9;0.2;3;100
+avocado;Авокадо;veg;fresh;160;2;15;2;70;norand
+vegsalad;Салат из свежих овощей с маслом;veg;salad;70;1;5.5;4;200
+coleslaw;Салат из капусты с морковью;veg;salad;50;1.3;2.5;5;200
+vinegret;Винегрет;veg;salad;75;1.5;5;7;150
+greeksalad;Салат греческий;veg;salad;100;3;8;4;200
+caesar;Салат цезарь с курицей;veg;salad;190;11;13;7;200
+olivier;Салат оливье;veg;salad;200;5;17;7;150;norand
+shuba;Сельдь под шубой;veg;salad;190;8;15;6;150;norand
+crabsalad;Крабовый салат;veg;salad;200;6;15;10;150;norand
+oat_water;Овсянка на воде;bfast;porridge;90;3;1.7;15;300
+oat_milk;Овсянка на молоке;bfast;porridge;105;3.5;3;15;300
+buck_milk;Гречневая каша на молоке;bfast;porridge;115;4.5;3;17;300
+rice_milk;Рисовая каша на молоке;bfast;porridge;100;2.5;2.5;17;300
+millet_milk;Пшённая каша на молоке;bfast;porridge;110;3.5;3;18;300
+semolina_milk;Манная каша на молоке;bfast;porridge;100;3;3;16;300
+corn_milk;Кукурузная каша на молоке;bfast;porridge;100;3;2.5;17;300
+oat_instant;Овсянка быстрого приготовления (пакет);bfast;porridge;370;10;7;63;40;norand
+omelet;Омлет;bfast;bdish;155;10;12;2;150
+omelet_veg;Омлет с овощами;bfast;bdish;120;8;9;3;200
+friedeggs;Яичница;bfast;bdish;195;13;15;1;120
+syrniki;Сырники ПП (творог 5% + яйцо + мука);bfast;bdish;134;14.7;5.4;6.3;1;pc=290,ul=порц.,st=0.5;Порция: творог 200 г + яйцо + мука 20 г, на сухой сковороде
+syrniki_fried;Сырники жареные;bfast;bdish;220;16;10;16;150
+zapekanka;Запеканка творожная;bfast;bdish;170;15;6;15;200
+lazyvareniki;Ленивые вареники;bfast;bdish;200;13;6;24;200
+vareniki_curd;Вареники с творогом;bfast;bdish;200;10;5;28;200
+bliny;Блины;bfast;bdish;230;6;10;29;150
+pancakes;Панкейки;bfast;bdish;230;6;8;33;150
+oladyi;Оладьи;bfast;bdish;260;6;11;34;150;norand
+sandw_cheese;Бутерброд с сыром;bfast;bdish;300;12;14;31;100
+sandw_ham;Бутерброд с ветчиной;bfast;bdish;260;10;12;28;100
+sandw_chicken;Сэндвич с курицей;bfast;bdish;220;13;8;24;200
+toast_avo;Тост с авокадо и яйцом;bfast;bdish;210;8;12;17;150
+croissant;Круассан;bfast;bdish;400;8;21;45;60;norand
+muesli;Мюсли;bfast;cereal;370;9;7;65;50;norand
+granola;Гранола;bfast;cereal;450;10;18;60;50;norand
+cornflakes;Кукурузные хлопья;bfast;cereal;360;7;1;83;40;norand
+egg;Яйцо;dairy;eggs;157;12.7;11;0.8;3;pc=50;1 шт ≈ 50 г без скорлупы
+eggwhite;Яичный белок;dairy;eggs;52;11;0.2;0.7;3;pc=33,norand;Белок одного яйца ≈ 33 г
+quail;Яйцо перепелиное;dairy;eggs;168;12;13;0.6;5;pc=10,norand
+cottage0;Творог 0%;dairy;curd;70;16;0.5;1.5;200
+cottage2;Творог 2%;dairy;curd;103;18;2;3;200
+cottage;Творог 5%;dairy;curd;120;17;5;2;200
+cottage9;Творог 9%;dairy;curd;160;16;9;2;200
+grainy;Зернёный творог 5%;dairy;curd;105;12;5;2;200
+curdmass;Творожная масса сладкая;dairy;curd;230;7;10;27;100;norand
+skyr;Скир;dairy;yog;65;11;0.2;4;250
+greek;Греческий йогурт 2%;dairy;yog;70;9;2;4;250
+greek5;Греческий йогурт 5%;dairy;yog;100;8;5;4;200
+yogurt;Йогурт натуральный 2,5%;dairy;yog;60;4;2.5;5;250
+yogfruit;Йогурт фруктовый 2,5%;dairy;yog;90;3;2.5;13;250
+kefir;Кефир 1%;dairy;drink;40;3;1;4;500;ml
+kefir25;Кефир 2,5%;dairy;drink;50;3;2.5;4;500;ml
+kefir32;Кефир 3,2%;dairy;drink;56;3;3.2;4;500;ml
+ryazhenka;Ряженка 2,5%;dairy;drink;55;3;2.5;4.2;500;ml
+ryazh4;Ряженка 4%;dairy;drink;69;3;4;4.2;500;ml
+varenets;Варенец 2,5%;dairy;drink;53;3;2.5;4.1;500;ml
+prostokv;Простокваша 2,5%;dairy;drink;53;2.9;2.5;4.1;500;ml
+ayran;Айран;dairy;drink;30;1.2;1.5;2;500;ml
+yogdrink;Йогурт питьевой 1,5%;dairy;drink;60;3;1.5;8;300;ml
+snezhok;Снежок 2,5%;dairy;drink;85;2.8;2.5;12;300;ml,norand
+milk;Молоко 1,5%;dairy;drink;45;3;1.5;4.8;250;ml
+milk25;Молоко 2,5%;dairy;drink;52;3;2.5;4.7;250;ml
+milk32;Молоко 3,2%;dairy;drink;60;3;3.2;4.7;250;ml
+cheese;Сыр твёрдый;dairy;cheese;350;25;27;0;30
+cheeselight;Сыр лёгкий 17%;dairy;cheese;270;29;17;0;40
+mozzarella;Моцарелла;dairy;cheese;250;18;19;1;50
+adyg;Сыр адыгейский;dairy;cheese;240;18;18;2;50
+feta;Фета / брынза;dairy;cheese;260;17;21;0.5;40
+suluguni;Сулугуни;dairy;cheese;285;20;22;0;40
+parmesan;Пармезан;dairy;cheese;390;33;28;0;20
+creamcheese;Творожный сыр;dairy;cheese;240;7;22;3;30
+processed;Сыр плавленый;dairy;cheese;250;12;20;5;30
+whey;Протеин;dairy;prot;400;83;5;6.7;1;pc=30,ul=порц.,st=0.5;1 порция = 30 г порошка
+casein;Казеин;dairy;prot;360;80;1.5;7;1;pc=30,ul=порц.,st=0.5;1 порция = 30 г порошка
+protshake;Протеиновый коктейль готовый;dairy;prot;60;10;1;4;330;ml
+banana;Банан;fruit;fresh;95;1.5;0.3;21;120;;1 банан ≈ 120 г без кожуры
+apple;Яблоко;fruit;fresh;50;0.4;0.4;11;150;;1 яблоко ≈ 150 г
+pear;Груша;fruit;fresh;47;0.4;0.3;10.3;150
+citrus;Мандарин / апельсин;fruit;fresh;42;0.8;0.2;9;150;;2 мандарина или 1 апельсин ≈ 150 г
+grapefruit;Грейпфрут;fruit;fresh;35;0.7;0.2;6.5;250
+pomelo;Помело;fruit;fresh;38;0.8;0;8.6;200
+kiwi;Киви;fruit;fresh;48;1;0.4;10;150;;2 киви ≈ 150 г
+peach;Персик;fruit;fresh;45;0.9;0.1;9.5;150
+nectarine;Нектарин;fruit;fresh;48;1;0.3;10;150
+apricotf;Абрикос;fruit;fresh;44;0.9;0.1;9;150
+plum;Слива;fruit;fresh;46;0.8;0.3;10;150
+sourcherry;Вишня;fruit;fresh;52;0.8;0.5;10;150
+sweetcherry;Черешня;fruit;fresh;52;1.1;0.4;11;150
+grapes;Виноград;fruit;fresh;70;0.6;0.2;17;100
+persimmon;Хурма;fruit;fresh;65;0.5;0.4;15;150
+pomegranate;Гранат;fruit;fresh;72;0.7;0.6;14.5;150
+pineapple;Ананас;fruit;fresh;52;0.4;0.2;11.5;150
+mango;Манго;fruit;fresh;65;0.5;0.3;13.5;150
+watermelon;Арбуз;fruit;fresh;27;0.6;0.1;6;300
+melon;Дыня;fruit;fresh;35;0.6;0.3;7.4;250
+berries;Ягоды (свежие или замороженные);fruit;fresh;45;1;0.4;9;150
+strawberry;Клубника;fruit;fresh;35;0.8;0.4;7.5;200
+raspberry;Малина;fruit;fresh;46;0.8;0.5;8.3;150
+blueberry;Черника / голубика;fruit;fresh;44;1;0.5;8;150
+currant;Смородина;fruit;fresh;44;1;0.4;7.5;150
+dates;Финики;fruit;dried;280;2.5;0.4;70;25
+apricot;Курага;fruit;dried;240;3.5;0.4;55;25
+prunes;Чернослив;fruit;dried;240;2.3;0.7;57;25
+raisins;Изюм;fruit;dried;270;3;0.5;66;25
+fig;Инжир сушёный;fruit;dried;255;3;0.8;58;25
+cranberry_d;Клюква сушёная;fruit;dried;310;0.1;1.4;77;20
+almonds;Миндаль;snack;nuts;600;21;52;13;30
+walnut;Грецкий орех;snack;nuts;655;15;65;7;25
+hazelnut;Фундук;snack;nuts;650;15;61;9.4;25
+cashew;Кешью;snack;nuts;600;18;48;30;25
+peanut;Арахис;snack;nuts;570;26;49;10;30
+pistachio;Фисташки (очищенные);snack;nuts;560;20;45;28;30
+pine;Кедровые орехи;snack;nuts;670;14;68;13;20
+pecan;Пекан;snack;nuts;690;9;72;14;20
+seeds;Семечки подсолнечника;snack;nuts;600;21;53;11;25
+pumpkinseeds;Тыквенные семечки;snack;nuts;560;24;46;14;25
+pb;Арахисовая паста;snack;nuts;600;25;50;15;30
+almondbutter;Миндальная паста;snack;nuts;610;21;55;19;20
+crispbread;Хлебцы цельнозерновые;snack;crisp;330;10;3;60;30;;1 хлебец ≈ 10 г
+ricecakes;Хлебцы рисовые;snack;crisp;380;8;3;80;20
+protbar;Протеиновый батончик;snack;crisp;333;33;11.7;25;1;pc=60;1 шт ≈ 60 г — точнее по этикетке
+cerealbar;Злаковый батончик;snack;crisp;400;6;12;68;25
+galety;Галеты;snack;crisp;380;10;5;74;30
+crackers;Крекер;snack;crisp;440;10;15;68;30
+sushki;Сушки;snack;crisp;340;11;1.3;72;30
+popcorn;Попкорн несладкий;snack;crisp;390;12;4.5;78;30
+chips;Чипсы;snack;crisp;530;6;30;55;30;norand
+choc;Тёмный шоколад 70%+;snack;sweet;560;8;40;35;25
+milkchoc;Шоколад молочный;snack;sweet;540;7;32;57;25
+candy;Конфеты шоколадные;snack;sweet;500;4;27;60;30
+glazed;Сырок глазированный;snack;sweet;400;8.5;27;32;1;pc=40
+marshmallow;Зефир / пастила;snack;sweet;320;1;0;79;35;;1 зефирина ≈ 35 г
+marmalade;Мармелад;snack;sweet;320;0;0.1;79;30
+honey;Мёд;snack;sweet;320;0.8;0;80;15;;1 ч. л. ≈ 8 г
+jam;Варенье;snack;sweet;270;0.3;0.2;70;20
+condmilk;Сгущёнка;snack;sweet;320;7;8.5;55;30
+halva;Халва подсолнечная;snack;sweet;520;12;30;54;30
+oatcookie;Печенье овсяное;snack;sweet;440;6.5;14;71;40
+cookie;Печенье сахарное;snack;sweet;420;7.5;12;72;30
+wafers;Вафли;snack;sweet;530;4;30;60;30
+gingerbread;Пряник;snack;sweet;350;5;3;77;50
+icecream;Мороженое пломбир;snack;sweet;230;3.2;15;21;80
+cake;Торт (наполеон и подобные);snack;sweet;450;6;28;43;100
+eclair;Пирожное эклер;snack;sweet;330;5;19;35;70
+sugar;Сахар;snack;sweet;400;0;0;100;10;st=5
+coffee;Кофе чёрный без сахара;drink;hot;2;0.2;0;0.3;250;ml
+cappuccino;Капучино;drink;hot;45;2.3;2.3;3.5;250;ml
+latte;Латте;drink;hot;55;3;2.7;4.5;300;ml
+cocoa;Какао на молоке;drink;hot;80;3.5;3;10;250;ml
+teasugar;Чай с сахаром;drink;hot;16;0;0;4;250;ml;2 ч. л. сахара на кружку
+juice_or;Сок апельсиновый;drink;soft;45;0.7;0.2;10;250;ml
+juice_apple;Сок яблочный;drink;soft;46;0.4;0.1;11;250;ml
+smoothie;Смузи фруктовый;drink;soft;55;0.8;0.3;12.5;300;ml
+mors;Морс клюквенный;drink;soft;40;0;0;10;250;ml
+kompot;Компот;drink;soft;60;0.2;0;15;250;ml
+kvas;Квас;drink;soft;27;0.2;0;5.2;500;ml
+cola;Кола;drink;soft;42;0;0;10.6;330;ml
+cola0;Кола без сахара;drink;soft;0.3;0;0;0;330;ml
+beer;Пиво светлое;drink;alco;43;0.5;0;4.6;500;ml
+wine_dry;Вино сухое;drink;alco;70;0.1;0;0.5;150;ml
+wine_semi;Вино полусладкое;drink;alco;80;0.2;0;3.6;150;ml
+vodka;Водка;drink;alco;235;0;0;0.1;50;ml
+whisky;Виски / коньяк;drink;alco;240;0;0;0;50;ml
+oil;Растительное масло;fat;oil;900;0;100;0;5;oil,st=5;1 ч. л. ≈ 5 г
+olive;Оливковое масло;fat;oil;900;0;100;0;5;oil,st=5;1 ч. л. ≈ 5 г
+butter;Сливочное масло 82%;fat;oil;750;0.5;82;0.8;10;oil,norand
+ghee;Масло топлёное;fat;oil;890;0.2;99;0;5;oil,norand
+coconut;Кокосовое масло;fat;oil;900;0;100;0;5;oil,norand
+sourcream;Сметана 10%;fat;sauce;115;3;10;3;30;;1 ст. л. ≈ 20 г
+sour15;Сметана 15%;fat;sauce;160;2.6;15;3;30
+sour20;Сметана 20%;fat;sauce;205;2.5;20;3.4;30
+cream10;Сливки 10%;fat;sauce;120;3;10;4;30;ml
+mayo;Майонез лёгкий 30%;fat;sauce;300;1;30;6;15;;1 ст. л. ≈ 15 г
+mayo67;Майонез 67%;fat;sauce;625;0.3;67;2.6;15
+ketchup;Кетчуп;fat;sauce;100;1.5;0.5;23;20
+tomatopaste;Томатная паста;fat;sauce;90;4.8;0.5;17;20
+soy;Соевый соус;fat;sauce;50;6;0;6;15;;1 ст. л. ≈ 15 г
+mustard;Горчица;fat;sauce;150;8;10;8;10
+pesto;Песто;fat;sauce;450;5;45;6;15
+hummus;Хумус;fat;sauce;170;8;10;14;40
+tkemali;Ткемали;fat;sauce;55;0.3;0.3;13;20
+teriyaki;Соус терияки;fat;sauce;90;6;0;16;15
+bbq;Соус барбекю;fat;sauce;150;1;0.5;36;20
+cheesesauce;Сырный соус;fat;sauce;250;3;23;8;20
+yogsauce;Йогуртовый соус с зеленью;fat;sauce;70;4;3;6;30
+salsa;Сальса;fat;sauce;35;1.5;0.2;7;30
+`;
+// белковая еда: порции между такими продуктами подбираются по белку
+const isProt = p => !!p && (p.g === 'dairy' || (p.g === 'main' && (p.sg === 'meat' || p.sg === 'fish' || p.sg === 'deli')));
+const BUILTIN = FOODS.trim().split('\n').map(line => {
+  const [id, n, g, sg, k, p, f, c, d, flags = '', hint = ''] = line.split(';');
+  const o = { id, n, g, sg: sg || undefined, k: +k, p: +p, f: +f, c: +c, d: +d, u: 'g' };
+  for (const fl of flags.split(',').filter(Boolean)) {
+    const [key, val] = fl.split('=');
+    if (key === 'raw') o.q = 'сыр.';
+    else if (key === 'dry') { o.q = 'сух.'; o.dry = 1; }
+    else if (key === 'ml') o.u = 'ml';
+    else if (key === 'pc') { o.u = 'pc'; o.pw = +val; }
+    else if (key === 'ul') o.ul = val;
+    else if (key === 'st') o.st = +val;
+    else o[key] = 1;
+  }
+  if (!o.st) o.st = o.u === 'pc' ? 1 : (o.u === 'ml' || g === 'veg' || sg === 'soup' || sg === 'tuber') ? 50 : o.d <= 40 ? 5 : 10;
+  if (hint) o.hint = hint;
+  if (isProt(o) && o.f >= 6) o.fatty = 1; // жирнее — масло в этом приёме не нужно
+  return o;
+});
 const BMAP = Object.fromEntries(BUILTIN.map(p => [p.id, p]));
 
 const GROUPS = [
-  ['meat', 'Мясо и птица'], ['fish', 'Рыба и морепродукты'], ['dairy', 'Яйца и молочное'],
-  ['garnish', 'Гарниры'], ['veg', 'Овощи'], ['fruit', 'Фрукты и ягоды'],
-  ['snack', 'Перекусы'], ['fat', 'Масло и соусы'], ['other', 'Другое'],
+  ['main', 'Основное блюдо'], ['garnish', 'Гарниры и хлеб'], ['veg', 'Овощи и салаты'], ['bfast', 'Завтраки и каши'],
+  ['dairy', 'Яйца и молочное'], ['fruit', 'Фрукты и ягоды'], ['snack', 'Перекусы и сладкое'], ['drink', 'Напитки'],
+  ['fat', 'Масло и соусы'], ['other', 'Другое'],
 ];
 const GNAME = Object.fromEntries(GROUPS);
 // подгруппы: по ним строится случайное меню, поэтому свой продукт тоже выбирает подгруппу
 const SGNAME = {
-  eggs: 'Яйца', curd: 'Творог и сырники', yog: 'Йогурты и скир', drink: 'Кефир и молоко', cheese: 'Сыр', prot: 'Протеин',
+  meat: 'Мясо и птица', fish: 'Рыба и морепродукты', dish: 'Готовые блюда', soup: 'Супы', deli: 'Колбасы и копчёности',
   grain: 'Крупы и макароны — сухой вес', tuber: 'Картофель и батат', bread: 'Хлеб и лаваш',
-  fresh: 'Свежие', dried: 'Сухофрукты',
+  fresh: 'Свежие', salad: 'Салаты',
+  porridge: 'Каши', bdish: 'Блюда к завтраку', cereal: 'Хлопья и мюсли',
+  eggs: 'Яйца', curd: 'Творог', yog: 'Йогурты и скир', drink: 'Кефир и молоко', cheese: 'Сыр', prot: 'Протеин',
+  dried: 'Сухофрукты',
   nuts: 'Орехи и семечки', crisp: 'Хлебцы и батончики', sweet: 'Сладкое',
+  hot: 'Кофе и чай', soft: 'Соки и газировка', alco: 'Алкоголь',
   oil: 'Масла', sauce: 'Соусы',
 };
 const SG_ORDER = Object.keys(SGNAME);
 const CAT_SG = {
-  dairy: ['eggs', 'curd', 'yog', 'drink', 'cheese', 'prot'], garnish: ['grain', 'tuber', 'bread'],
-  fruit: ['fresh', 'dried'], snack: ['nuts', 'crisp', 'sweet'], fat: ['oil', 'sauce'],
+  main: ['meat', 'fish', 'dish', 'soup', 'deli'], garnish: ['grain', 'tuber', 'bread'], veg: ['fresh', 'salad'],
+  bfast: ['porridge', 'bdish', 'cereal'], dairy: ['eggs', 'curd', 'yog', 'drink', 'cheese', 'prot'],
+  fruit: ['fresh', 'dried'], snack: ['nuts', 'crisp', 'sweet'], drink: ['hot', 'soft', 'alco'], fat: ['oil', 'sauce'],
 };
-// куда попадает продукт подгруппы в случайном меню — подсказка в форме своего продукта
-const SG_ROLE = {
-  eggs: 'завтрак', curd: 'завтрак', yog: 'завтрак и перекус', drink: 'перекус', prot: 'перекус', cheese: '',
-  grain: 'гарнир к обеду и ужину', tuber: 'гарнир к обеду и ужину', bread: 'завтрак',
-  fresh: 'перекус и «в течение дня»', dried: '', nuts: '«в течение дня»', crisp: '', sweet: '',
-  oil: 'обед и ужин', sauce: '',
+// куда попадает продукт в случайном меню — подсказка в форме своего продукта
+function roleOf(g, sg) {
+  const R = {
+    'main:meat': 'основа обеда или ужина с гарниром', 'main:fish': 'основа обеда или ужина с гарниром',
+    'main:dish': 'обед или ужин целиком', 'main:soup': 'суп к обеду',
+    'garnish:grain': 'гарнир к обеду и ужину', 'garnish:tuber': 'гарнир к обеду и ужину', 'garnish:bread': 'завтрак и к супу',
+    'veg:fresh': 'обед и ужин', 'bfast:porridge': 'завтрак', 'bfast:bdish': 'завтрак',
+    'dairy:eggs': 'завтрак', 'dairy:curd': 'завтрак', 'dairy:yog': 'завтрак и перекус', 'dairy:drink': 'перекус', 'dairy:prot': 'перекус',
+    'fruit:fresh': 'перекус', 'snack:nuts': 'перекус', 'fat:oil': 'обед и ужин',
+  };
+  return R[g + ':' + sg] || '';
+}
+// близкие подгруппы — для советов (яйца ближе к творогу, чем к кефиру)
+const SG_NEAR = {
+  meat: ['fish'], fish: ['meat'], dish: ['soup'], soup: ['dish'], porridge: ['bdish'], bdish: ['porridge'],
+  eggs: ['curd', 'cheese'], curd: ['eggs', 'yog'], yog: ['curd', 'drink'], drink: ['yog', 'prot'], prot: ['drink', 'yog'], cheese: ['curd'],
+  tuber: ['grain'], grain: ['tuber'],
 };
-const CAT_ROLE = { meat: 'обед', fish: 'ужин', veg: 'обед и ужин', other: '' };
-// близкие подгруппы — для рекомендаций (яйца ближе к творогу, чем к кефиру)
-const SG_NEAR = { eggs: ['curd', 'cheese'], curd: ['eggs', 'yog'], yog: ['curd', 'drink'], drink: ['yog', 'prot'], prot: ['drink', 'yog'], cheese: ['curd'], tuber: ['grain'], grain: ['tuber'] };
-const PROTEIN_G = new Set(['meat', 'fish', 'dairy']);
 
-const MEALS = [
-  ['breakfast', 'Завтрак'], ['lunch', 'Обед'], ['snack', 'Перекус'], ['dinner', 'Ужин'], ['extra', 'В течение дня'],
-];
+// приёмы — как разделы в FatSecret
+const MEALS = [['breakfast', 'Завтрак'], ['lunch', 'Обед'], ['dinner', 'Ужин'], ['snack', 'Перекус']];
 
 const BASE_DAY = {
   breakfast: [['egg', 3], ['cottage', 200], ['bread', 60]],
   lunch: [['chicken', 200], ['buckwheat', 80], ['veg', 200], ['oil', 5]],
-  snack: [['kefir', 500], ['banana', 120]],
   dinner: [['pollock', 250], ['rice', 80], ['veg', 200], ['oil', 5]],
-  extra: [['apple', 150], ['almonds', 30]],
+  snack: [['kefir', 500], ['banana', 120], ['apple', 150], ['almonds', 30]],
 };
 
 // замены из плана: на базовое количество; при другом количестве пересчитываются пропорционально
 const SWAPS = {
-  egg: { base: 3, opts: [{ it: [['egg', 2], ['cheese', 30]] }, { it: [['tuna', 100]] }] },
-  cottage: { base: 200, opts: [{ it: [['syrniki', 1]] }, { it: [['skyr', 250]] }] },
+  cottage: { base: 200, opts: [{ it: [['skyr', 250]] }] },
   bread: { base: 60, opts: [{ it: [['oats', 40]] }, { it: [['lavash', 50]] }] },
   chicken: { base: 200, opts: [{ it: [['turkey', 200]] }, { it: [['beef', 180]] }] },
   buckwheat: { base: 80, opts: [{ it: [['bulgur', 80]] }, { it: [['potato', 300]] }] },
   kefir: { base: 500, opts: [{ it: [['whey', 1]], note: 'Протеиновый коктейль' }, { it: [['greek', 250]] }] },
-  banana: { base: 120, opts: [{ it: [['citrus', 150]] }, { it: [['dates', 25]] }, { it: [['apricot', 25]] }] },
+  banana: { base: 120, opts: [{ it: [['citrus', 150]] }] },
   pollock: { base: 250, opts: [{ it: [['cod', 250]] }, { it: [['salmon', 200]] }] },
   hake: { base: 250, opts: [{ it: [['cod', 250]] }, { it: [['salmon', 200]] }] },
   rice: { base: 80, opts: [{ it: [['pasta', 80]] }, { it: [['couscous', 80]] }] },
-  almonds: { base: 30, opts: [{ it: [['pb', 30]] }, { it: [['choc', 25]] }] },
+  almonds: { base: 30, opts: [{ it: [['pb', 30]] }] },
 };
 
 const DEFAULT_TARGETS = { k: 2400, p: [180, 190], f: [70, 90], c: [220, 250], fMin: 60 };
 
 const RULES = [
-  '3–4 приёма пищи; в каждом белок + гарнир + овощи.',
-  'Первые 2 недели всё взвешивать и записывать.',
+  '3–4 приёма пищи; в каждом белок + гарнир + овощи — или одно готовое блюдо.',
   'Крупы и макароны — сухой вес, мясо и рыба — сырой.',
-  'Замены: белок на белок по граммам белка, гарнир на гарнир по сухому весу. В приложении замена и добавление — только внутри своей категории.',
+  'Замены: белок на белок по граммам белка, гарнир на гарнир по сухому весу.',
   'Если продукт жирнее (бедро, горбуша, говядина) — убрать масло из этого приёма.',
   'Сладкое и алкоголь — 1–2 раза в неделю в рамках калорий.',
   'Шаги: 8–10 тысяч в день.',
@@ -506,14 +834,22 @@ let undoStack = [];
 let sync = 'local';
 
 function blankState() {
-  return { v: 1, updatedAt: 0, days: {}, template: null, targets: { ...DEFAULT_TARGETS }, custom: [] };
+  return { v: 1, updatedAt: 0, days: {}, template: null, targets: { ...DEFAULT_TARGETS }, custom: [], fav: {} };
 }
 function normalize(x) {
   const s = blankState();
   if (!x || typeof x !== 'object') return s;
   const c = JSON.parse(JSON.stringify(x));
-  const custom = (Array.isArray(c.custom) ? c.custom : []).map(p => ({ ...p, g: GNAME[p.g] ? p.g : p.g === 'protein' ? 'meat' : 'other' }));
-  return { ...s, ...c, targets: { ...DEFAULT_TARGETS, ...(c.targets || {}) }, days: c.days || {}, custom };
+  const custom = (Array.isArray(c.custom) ? c.custom : []).map(p => {
+    if (p.g === 'meat' || p.g === 'fish' || p.g === 'protein') return { ...p, sg: p.g === 'fish' ? 'fish' : 'meat', g: 'main' };
+    return { ...p, g: GNAME[p.g] ? p.g : 'other' };
+  });
+  // «В течение дня» теперь часть «Перекуса» (как в FatSecret)
+  const mergeExtra = m => { if (m && m.extra) { m.snack = (m.snack || []).concat(m.extra); delete m.extra; } return m; };
+  const days = c.days || {};
+  for (const d of Object.values(days)) { mergeExtra(d.meals || {}); if (d.fact) delete d.fact.extra; }
+  if (c.template) mergeExtra(c.template);
+  return { ...s, ...c, targets: { ...DEFAULT_TARGETS, ...(c.targets || {}) }, days, custom, fav: c.fav && typeof c.fav === 'object' ? c.fav : {} };
 }
 function loadLocal() {
   try { const raw = localStorage.getItem(LS_KEY); if (raw) S = normalize(JSON.parse(raw)); } catch (e) { }
@@ -544,8 +880,7 @@ function nutr(pid, a) {
   return { k: u.k * a, p: u.p * a, f: u.f * a, c: u.c * a };
 }
 // сколько съедено: факт, если отмечен, иначе — по плану
-function eatAmt(it) { return it.done && it.fact != null ? it.fact : it.a; }
-function itemN(it) { return nutr(it.p, eatAmt(it)); }
+function itemN(it) { return nutr(it.p, it.a); }
 function addN(t, n) { t.k += n.k; t.p += n.p; t.f += n.f; t.c += n.c; return t; }
 function zero() { return { k: 0, p: 0, f: 0, c: 0 }; }
 function unitLabel(p) { return p.ul || (p.u === 'ml' ? 'мл' : p.u === 'pc' ? 'шт' : 'г'); }
@@ -579,40 +914,62 @@ function dayFromTemplate(t) {
 function emptyDay() { return { meals: Object.fromEntries(MEALS.map(([mk]) => [mk, []])), weight: null }; }
 
 /* ---------- случайное меню дня ---------- */
-// структура как у базового дня: у каждой позиции свой набор продуктов и эталон (продукт, количество) для пересчёта порции
-const DAY_PLAN = {
-  breakfast: [['egg', 'egg', 3], ['curd', 'cottage', 200], ['bread', 'bread', 60]],
-  lunch: [['meat', 'chicken', 200], ['side', 'buckwheat', 80], ['veg', 'veg', 200], ['oil', 'oil', 5]],
-  snack: [['drink', 'kefir', 500], ['fruit', 'banana', 120]],
-  dinner: [['fish', 'pollock', 250], ['side', 'rice', 80], ['veg', 'veg', 200], ['oil', 'oil', 5]],
-  extra: [['fruit', 'apple', 150], ['nuts', 'almonds', 30]],
+// Шаблоны приёмов. Обед и ужин: белок + гарнир + овощи, или одно готовое блюдо, или суп с белком.
+// У позиции эталон base — [продукт, количество] (порция пересчитывается равноценно), или kcal — сколько калорий отдать позиции.
+const MEAL_TPL = {
+  breakfast: [
+    { w: 6, slots: [{ pool: 'egg', base: ['egg', 3] }, { pool: 'curd', base: ['cottage', 200] }, { pool: 'bread', base: ['bread', 60] }] },
+    { w: 4, slots: [{ pool: 'bdish', kcal: 380 }, { pool: 'curd', base: ['cottage', 150] }] },
+  ],
+  lunch: [
+    { w: 55, slots: [{ pool: 'protein', base: ['chicken', 200] }, { pool: 'side', base: ['buckwheat', 80] }, { pool: 'veg', base: ['veg', 200] }, { pool: 'oil', base: ['oil', 5] }] },
+    { w: 25, slots: [{ pool: 'dish', kcal: 520 }, { pool: 'veg', base: ['veg', 200] }] },
+    { w: 20, slots: [{ pool: 'soup', base: ['borsch', 300] }, { pool: 'protein', base: ['chicken', 150] }, { pool: 'loaf', base: ['bread', 30] }] },
+  ],
+  dinner: [
+    { w: 70, slots: [{ pool: 'protein', base: ['pollock', 250] }, { pool: 'side', base: ['rice', 80] }, { pool: 'veg', base: ['veg', 200] }, { pool: 'oil', base: ['oil', 5] }] },
+    { w: 30, slots: [{ pool: 'dish', kcal: 480 }, { pool: 'veg', base: ['veg', 200] }] },
+  ],
+  snack: [
+    { w: 1, slots: [{ pool: 'drink', base: ['kefir', 500], fill: true }, { pool: 'fruit', base: ['banana', 120] }, { pool: 'fruit', base: ['apple', 150] }, { pool: 'nuts', base: ['almonds', 30] }] },
+  ],
 };
-// наборы строятся по категории и подгруппе — свои продукты попадают в них сами (если не выключено «в случайном меню»)
+// наборы строятся по категории и подгруппе — свои продукты попадают в них сами
 const POOLS = {
   egg: p => p.g === 'dairy' && p.sg === 'eggs',
   curd: p => p.g === 'dairy' && (p.sg === 'curd' || p.sg === 'yog'),
   bread: p => p.g === 'garnish' && (p.sg === 'bread' || p.id === 'oats'),
+  loaf: p => p.g === 'garnish' && p.sg === 'bread',
+  bdish: p => p.g === 'bfast' && (p.sg === 'porridge' || p.sg === 'bdish'),
+  protein: p => p.g === 'main' && (p.sg === 'meat' || p.sg === 'fish'),
   side: p => p.g === 'garnish' && ((p.sg === 'grain' && p.id !== 'oats') || p.sg === 'tuber'),
-  meat: p => p.g === 'meat',
-  fish: p => p.g === 'fish',
-  veg: p => p.g === 'veg',
-  oil: p => p.g === 'fat' && p.sg === 'oil' && p.id !== 'butter',
+  dish: p => p.g === 'main' && p.sg === 'dish',
+  soup: p => p.g === 'main' && p.sg === 'soup',
+  veg: p => p.g === 'veg' && p.sg === 'fresh',
+  oil: p => p.g === 'fat' && p.sg === 'oil',
   drink: p => p.g === 'dairy' && (p.sg === 'drink' || p.sg === 'yog' || p.sg === 'prot'),
   fruit: p => p.g === 'fruit' && p.sg === 'fresh',
   nuts: p => p.g === 'snack' && p.sg === 'nuts',
 };
-function poolIds(k) { return allProducts().filter(p => !p.norand && POOLS[k](p)).map(p => p.id); }
+// любимое попадает в меню, даже если само по себе оно «не для случайного меню» (пицца, шаурма)
+function poolIds(k) { return allProducts().filter(p => (!p.norand || isFav(p.id)) && POOLS[k](p)).map(p => p.id); }
+function isFav(id) { return !!(S.fav && S.fav[id]); }
 
-// порция продукта x, равноценная a продукта pid: белковые — по белку, крупы — сухой вес, овощи и масло — тот же вес, остальное — по калориям
+// порция продукта x, равноценная a продукта pid: белковые — по белку, крупы — сухой вес,
+// овощи, масло и супы — тот же вес, остальное — по калориям; не больше 2,5 обычных порций
 function equivAmount(pid, a, xid) {
   const p = prod(pid), x = prod(xid), cur = nutr(pid, a), u = perUnit(x);
   let r;
-  if (PROTEIN_G.has(p.g) && PROTEIN_G.has(x.g) && cur.p > 0 && u.p > 0) r = cur.p / u.p;
-  else if ((p.dry && x.dry) || (p.g === 'veg' && x.g === 'veg' && p.u === x.u) || (p.oil && x.oil && p.u === x.u)) r = a;
+  if (isProt(p) && isProt(x) && cur.p > 0 && u.p > 0) r = cur.p / u.p;
+  else if ((p.dry && x.dry) || (p.g === 'veg' && x.g === 'veg' && p.u === x.u) || (p.oil && x.oil && p.u === x.u) || (p.sg === 'soup' && x.sg === 'soup')) r = a;
   else r = u.k ? cur.k / u.k : a;
-  // не больше 2,5 обычных порций: иначе продукт с малым белком превращается в полкило
   r = Math.min(r, (x.d || 100) * 2.5);
   return roundStep(xid, r);
+}
+// порция на заданные калории (для готовых блюд в случайном меню)
+function kcalAmount(xid, kcal) {
+  const x = prod(xid), u = perUnit(x);
+  return roundStep(xid, Math.min(u.k ? kcal / u.k : x.d || 100, (x.d || 100) * 2.5));
 }
 // сколько ккал можно отдать позиции: цель минус остальной день, но не меньше, чем она даёт сейчас
 function slotRoom(day, it) {
@@ -647,55 +1004,71 @@ function daysAgo(lu, pid, key) { return lu[pid] ? Math.round((parseKey(key) - pa
 function freshness(lu, pid, key) { const d = daysAgo(lu, pid, key); return d == null ? 15 : Math.min(d, 14); }
 function plural(n, a, b, c) { const m10 = n % 10, m100 = n % 100; return m10 === 1 && m100 !== 11 ? a : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? b : c; }
 function whyText(lu, pid, key) {
+  if (isFav(pid)) return 'любимое';
   const d = daysAgo(lu, pid, key);
   return d == null ? 'давно не было' : d <= 1 ? 'было вчера' : `не было ${d} ${plural(d, 'день', 'дня', 'дней')}`;
 }
-function pickWeighted(ids, w) {
-  const ws = ids.map(w), sum = ws.reduce((a, b) => a + b, 0);
+function pickWeighted(items, w) {
+  const ws = items.map(w), sum = ws.reduce((a, b) => a + b, 0);
   let r = Math.random() * sum;
-  for (let i = 0; i < ids.length; i++) { r -= ws[i]; if (r <= 0) return ids[i]; }
-  return ids[ids.length - 1];
+  for (let i = 0; i < items.length; i++) { r -= ws[i]; if (r <= 0) return items[i]; }
+  return items[items.length - 1];
 }
 // несколько случайных попыток; берём первую, что укладывается в калории и белок, иначе лучшую
 function generateDay(key, avoid) {
   const lu = lastUsed(key), T = S.targets;
+  // вес выбора: давно не было — чаще; любимое — в 6 раз чаще; своё — вдвое; то, что было в прошлом варианте, — реже
+  const weight = id => Math.pow(1 + freshness(lu, id, key), 1.5) * (isFav(id) ? 6 : 1) * (prod(id).custom ? 2 : 1) * (avoid && avoid.has(id) ? 0.2 : 1);
+  // шаблон приёма, где может оказаться любимое, выбирается втрое чаще
+  const pools = {}; for (const k of Object.keys(POOLS)) pools[k] = poolIds(k);
+  const favPool = Object.fromEntries(Object.entries(pools).map(([k, ids]) => [k, ids.some(isFav)]));
+  // белковый напиток: не меньше 0,4 г белка на 1 ккал (протеин, скир, греческий йогурт)
+  const proteinRich = id => { const u = perUnit(prod(id)); return u.k > 0 && u.p * 4 / u.k >= 0.4; };
   let best = null;
   for (let t = 0; t < 40; t++) {
-    const used = new Set(), meals = {};
+    const used = new Set(), meals = {}, sofar = zero();
     for (const [mk] of MEALS) {
       meals[mk] = [];
-      for (const [pool, bid, ba] of DAY_PLAN[mk]) {
-        const ids = poolIds(pool).filter(id => pool === 'oil' || !used.has(id));
+      const tpl = pickWeighted(MEAL_TPL[mk], x => x.w * (x.slots.some(s => favPool[s.pool]) ? 3 : 1));
+      for (const s of tpl.slots) {
+        let ids = pools[s.pool].filter(id => s.pool === 'oil' || !used.has(id));
+        // напиток перекуса добирает белок, которого не хватает дню (с запасом на фрукты и орехи)
+        const need = s.fill ? Math.max(15, T.p[0] - sofar.p - 10) : 0;
+        if (need > 25) { const rich = ids.filter(proteinRich); if (rich.length) ids = rich; }
         if (!ids.length) continue;
-        const pid = pickWeighted(ids, id => Math.pow(1 + freshness(lu, id, key), 1.5) * (avoid && avoid.has(id) ? 0.2 : 1) * (prod(id).custom ? 2 : 1));
+        const pid = pickWeighted(ids, weight);
         used.add(pid);
-        meals[mk].push({ id: uid(), p: pid, a: equivAmount(bid, ba, pid), done: false });
+        let a;
+        if (s.kcal) a = kcalAmount(pid, s.kcal);
+        else if (s.fill && need > 15) { const x = prod(pid), u = perUnit(x); a = roundStep(pid, Math.min(u.p ? need / u.p : x.d, (x.d || 100) * 2.5)); }
+        else a = equivAmount(s.base[0], s.base[1], pid);
+        meals[mk].push({ id: uid(), p: pid, a, done: false });
+        addN(sofar, nutr(pid, a));
       }
       // жирный белок — масло в этом приёме не нужно
       if (meals[mk].some(x => prod(x.p).fatty)) meals[mk] = meals[mk].filter(x => !prod(x.p).oil);
     }
     const s = dayTotals({ meals }).t;
-    const score = Math.abs(s.k - T.k) / 50 + Math.max(0, T.p[0] - s.p) / 4 + Math.max(0, s.f - T.f[1]) / 5 + Math.max(0, T.fMin - s.f) / 3;
+    const favs = Math.min(2, [...idsInDay({ meals })].filter(isFav).length);
+    const score = Math.abs(s.k - T.k) / 50 + Math.max(0, T.p[0] - s.p) / 4 + Math.max(0, s.f - T.f[1]) / 5 + Math.max(0, T.fMin - s.f) / 3 - favs * 1.5;
     if (!best || score < best.score) best = { score, meals };
     if (score <= 3) break;
   }
-  return { meals: best.meals, weight: null, gen: true };
+  return { meals: best.meals, gen: true };
 }
-// рекомендации в категории: чего нет в этом дне и что дольше всего не встречалось (своя подгруппа — вперёд)
-// base — заменяемая позиция {p, a}: варианты сильно калорийнее или легче уходят вниз
+// советы в категории: чего нет в этом дне, любимое и что дольше всего не встречалось (своя подгруппа — вперёд)
+// base — заменяемая позиция {p, a}: варианты сильно калорийнее или с недобором белка уходят вниз
 function recommend(g, key, excludeId, n, sg, base) {
   const inDay = idsInDay(getDay(key)), lu = lastUsed(key);
-  // штраф за разницу в ккал и, для белковых, за недобор белка — с порцией в пределах остатка дня
-  const room = base ? slotRoom(getDay(key), base) : 0, bn = base ? itemN(base) : null;
+  const room = base ? slotRoom(getDay(key), base) : 0, bn = base ? itemN(base) : null, bp = base ? prod(base.p) : null;
   const kGap = id => {
     if (!base) return 0;
     const n = nutr(id, fitAmount(base, id, room));
-    return Math.abs(n.k - bn.k) / 30 + (PROTEIN_G.has(g) ? Math.max(0, bn.p - n.p) / 3 : 0);
+    return Math.abs(n.k - bn.k) / 30 + (isProt(bp) ? Math.max(0, bn.p - n.p) / 3 : 0);
   };
   return allProducts()
-    .filter(x => x.g === g && x.id !== excludeId && !inDay.has(x.id) && !x.oil && !x.norand && (x.sg !== 'sweet' || sg === 'sweet')) // сладкое — 1–2 раза в неделю, само не советуем
-    // свои продукты — чуть вперёд: их заносят, чтобы есть
-    .map(x => ({ id: x.id, f: freshness(lu, x.id, key) + (sg && x.sg === sg ? 6 : (SG_NEAR[sg] || []).includes(x.sg) ? 4 : 0) + (x.custom ? 5 : 0) + Math.random() * 4 - kGap(x.id) }))
+    .filter(x => x.g === g && x.id !== excludeId && !inDay.has(x.id) && !x.oil && (!x.norand || isFav(x.id)) && (x.sg !== 'sweet' || sg === 'sweet' || isFav(x.id))) // сладкое само не советуем
+    .map(x => ({ id: x.id, f: freshness(lu, x.id, key) + (sg && x.sg === sg ? 6 : (SG_NEAR[sg] || []).includes(x.sg) ? 4 : 0) + (isFav(x.id) ? 8 : 0) + (x.custom ? 5 : 0) + Math.random() * 4 - kGap(x.id) }))
     .sort((a, b) => b.f - a.f).slice(0, n).map(o => o.id);
 }
 
@@ -808,6 +1181,8 @@ const IC = {
   prev: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
   next: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>',
   more: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
+  heart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>',
+  heartOn: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>',
   swap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4L3 8l4 4"/><path d="M3 8h13a4 4 0 0 1 4 4"/><path d="M17 20l4-4-4-4"/><path d="M21 16H8a4 4 0 0 1-4-4"/></svg>',
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   chev: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
@@ -852,13 +1227,23 @@ function macroBlock(cls, letter, v, range, min) {
   </div>`;
 }
 
+// факт приёма (внесён вручную, например из FatSecret) и сумма фактов за день
+function mealFact(d, mk) { const f = d.fact && d.fact[mk]; return f && f.k != null ? f : null; }
+function dayFact(d) {
+  const t = zero(), has = { p: 0, f: 0, c: 0 }; let n = 0;
+  for (const [mk] of MEALS) {
+    const f = mealFact(d, mk); if (!f) continue;
+    n++; t.k += f.k || 0;
+    for (const m of ['p', 'f', 'c']) if (f[m] != null) { t[m] += f[m]; has[m]++; }
+  }
+  return { t, n, has };
+}
 function renderDay() {
   const k = view.date, d = getDay(k), T = S.targets;
-  const { t, e } = dayTotals(d);
+  const { t } = dayTotals(d), F = dayFact(d);
   const [hint, isToday] = dateHint(k);
   const left = T.k - t.k;
-  const scaleMax = Math.max(T.k * 1.15, t.k);
-  const anyDone = e.k > 0;
+  const scaleMax = Math.max(T.k * 1.15, t.k, F.t.k);
   const leftTxt = Math.abs(left) <= 50 ? 'в цели' : left > 0 ? 'ещё ' + f0(left) : 'перебор ' + f0(-left);
   let h = `<header class="top">
     <div class="datebar">
@@ -868,64 +1253,102 @@ function renderDay() {
       <button class="iconbtn" data-act="daymenu" aria-label="Действия с днём">${IC.more}</button>
     </div>
     <div class="sum">
-      <div class="kline"><span class="big num">${f0(t.k)}</span><span class="of num">/ ${f0(T.k)} ккал</span><span class="left num ${left < -50 ? 'over' : ''}">${leftTxt}</span></div>
-      <div class="bar" role="img" aria-label="План ${f0(t.k)} из ${f0(T.k)} ккал"><i class="plan" style="width:${t.k / scaleMax * 100}%"></i><i class="eaten" style="width:${e.k / scaleMax * 100}%"></i><span class="tick" style="left:${T.k / scaleMax * 100}%"></span></div>
-      ${anyDone ? `<div class="eatline num"><span>Съедено ${f0(e.k)} ккал · Б ${f0(e.p)}</span><span>осталось по плану ${f0(t.k - e.k)}</span></div>` : ''}
+      <div class="kline"><span class="eyebrow">План</span><span class="big num">${f0(t.k)}</span><span class="of num">/ ${f0(T.k)} ккал</span><span class="left num ${left < -50 ? 'over' : ''}">${leftTxt}</span></div>
+      <div class="bar" role="img" aria-label="План ${f0(t.k)}, факт ${f0(F.t.k)} из ${f0(T.k)} ккал"><i class="plan" style="width:${t.k / scaleMax * 100}%"></i><i class="eaten" style="width:${F.t.k / scaleMax * 100}%"></i><span class="tick" style="left:${T.k / scaleMax * 100}%"></span></div>
       <div class="macros">
         ${macroBlock('p', 'Б', t.p, T.p)}
         ${macroBlock('f', 'Ж', t.f, T.f, T.fMin)}
         ${macroBlock('c', 'У', t.c, T.c)}
       </div>
+      <div class="factline num ${F.n ? '' : 'empty'}"><span class="eyebrow">Факт</span>${F.n
+        ? `<b>${f0(F.t.k)}</b><span>ккал${['p', 'f', 'c'].map(m => F.has[m] ? ` · ${{ p: 'Б', f: 'Ж', c: 'У' }[m]} ${f0(F.t[m])}` : '').join('')}</span><span class="fcount">${F.n} из ${MEALS.length}</span>`
+        : '<span>внесите по приёмам — кнопка «Факт» под каждым</span>'}</div>
     </div>
-    ${d.gen ? `<div class="draftnote"><span>Случайное меню: сначала то, чего давно не было</span><button class="linkbtn" data-act="regen">Другое меню</button></div>`
+    ${d.gen ? `<div class="draftnote"><span>Случайное меню: сначала любимое и то, чего давно не было</span><button class="linkbtn" data-act="regen">Другое меню</button></div>`
       : (!S.days[k] && k < todayKey()) ? `<div class="draftnote"><span>За этот день ничего не записано</span><button class="linkbtn" data-act="regen">Составить меню</button></div>` : ''}
   </header><div class="meals">`;
   for (const [mk, mn] of MEALS) {
     const arr = d.meals[mk] || [];
     const mt = arr.reduce((a, it) => addN(a, itemN(it)), zero());
-    h += `<section class="meal"><div class="mh"><h2>${mn}</h2>${arr.length ? `<span class="mk num"><b>${f0(mt.k)}</b> ккал</span>` : ''}</div>`;
+    const mf = mealFact(d, mk);
+    h += `<section class="meal"><div class="mh"><h2>${mn}</h2>${arr.length ? `<span class="mk num">${arr.filter(x => x.done).length} из ${arr.length} съедено</span>` : ''}</div>`;
     if (arr.length) {
       h += '<ul class="items">';
       for (const it of arr) {
         const p = prod(it.p); if (!p) continue;
         const n = itemN(it);
-        const canSwap = allProducts().some(x => x.g === p.g && x.id !== p.id);
-        // съедено не по плану — показываем факт и план рядом
-        const off = it.done && it.fact != null && it.fact !== it.a;
-        const amt = off ? `<span class="amt">съел ${amountText(p, it.fact)}</span> из ${f1(it.a)}` : `<span class="amt">${amountText(p, it.a)}</span>`;
-        h += `<li class="item ${it.done ? 'done' : ''} ${off ? 'off' : ''}">
-          <button class="chk" data-act="toggle" data-id="${it.id}" aria-label="${it.done ? 'Снять отметку' : 'Отметить съеденным'}: ${esc(p.n)}"></button>
-          <button class="ibody" data-act="${it.done ? 'fact' : 'amount'}" data-id="${it.id}"><span class="nm">${esc(p.n)}</span><span class="sub num">${amt}${n.p >= 1 ? ` · белок ${f0(n.p)} г` : ''}</span></button>
+        h += `<li class="item ${it.done ? 'done' : ''}">
+          <button class="chk" data-act="toggle" data-id="${it.id}" aria-label="${it.done ? 'Не ел' : 'Ел'}: ${esc(p.n)}"></button>
+          <button class="ibody" data-act="amount" data-id="${it.id}"><span class="nm">${isFav(p.id) ? '<span class="favdot" aria-label="любимое">♥</span>' : ''}${esc(p.n)}</span><span class="sub num"><span class="amt">${amountText(p, it.a)}</span>${n.p >= 1 ? ` · белок ${f0(n.p)} г` : ''}</span></button>
           <span class="ikc num">${f0(n.k)}</span>
-          <button class="swbtn" data-act="swap" data-id="${it.id}" aria-label="Заменить ${esc(p.n)}" ${canSwap ? '' : 'disabled'}>${IC.swap}</button>
+          <button class="swbtn" data-act="swap" data-id="${it.id}" aria-label="Заменить ${esc(p.n)}">${IC.swap}</button>
         </li>`;
       }
       h += '</ul>';
     } else {
       h += `<div class="empty-meal">Пусто</div>`;
     }
-    h += `<button class="addbtn" data-act="add" data-meal="${mk}">${IC.plus}Добавить продукт</button></section>`;
+    // сводка приёма: план из продуктов и факт, внесённый вручную
+    const diff = mf ? mf.k - mt.k : 0;
+    h += `<div class="mtab num">
+        <span></span><span>ккал</span><span>Б</span><span>Ж</span><span>У</span>
+        <span class="lbl">План</span><b>${f0(mt.k)}</b><span>${f0(mt.p)}</span><span>${f0(mt.f)}</span><span>${f0(mt.c)}</span>
+      </div>
+      <button class="mtab mfact num" data-act="mfact" data-meal="${mk}">
+        <span class="lbl">Факт</span>${mf
+          ? `<b class="${diff > 100 ? 'over' : ''}">${f0(mf.k)}</b><span>${mf.p != null ? f0(mf.p) : '—'}</span><span>${mf.f != null ? f0(mf.f) : '—'}</span><span>${mf.c != null ? f0(mf.c) : '—'}</span>`
+          : '<span class="fempty">внести</span>'}
+      </button>
+      <button class="addbtn" data-act="add" data-meal="${mk}">${IC.plus}Добавить продукт</button></section>`;
   }
   h += '</div>';
   return h;
 }
 
+// окно факта приёма: ккал обязательно, белки/жиры/углеводы — по желанию
+function factSheet(mk) {
+  openSheet({
+    draw(el) {
+      const d = getDay(view.date), f = mealFact(d, mk) || {};
+      const plan = (d.meals[mk] || []).reduce((a, it) => addN(a, itemN(it)), zero());
+      const fld = (id, label, v, ph) => `<label class="fld"><span>${label}</span><input id="${id}" inputmode="decimal" autocomplete="off" value="${v == null ? '' : v}" placeholder="${ph}"></label>`;
+      el.innerHTML = `<div class="sw-head"><span class="eyebrow">Факт</span><h3 class="sh-h">${MEALS.find(m => m[0] === mk)[1]}</h3><p class="sh-sub num">По плану: ${f0(plan.k)} ккал · Б ${f0(plan.p)} · Ж ${f0(plan.f)} · У ${f0(plan.c)}</p></div>
+        <form id="fform" class="form" novalidate>
+          <div class="frow4">${fld('ff-k', 'ккал', f.k, f0(plan.k))}${fld('ff-p', 'Белки', f.p, f0(plan.p))}${fld('ff-f', 'Жиры', f.f, f0(plan.f))}${fld('ff-c', 'Углев.', f.c, f0(plan.c))}</div>
+          <p class="rule-hint form-hint">Перепишите итог приёма из FatSecret. Достаточно калорий.</p>
+          <div class="sh-actions"><button class="ghost" type="button" data-act="mfact-clear" data-meal="${mk}">Очистить</button><button class="primary" type="submit">Сохранить</button></div>
+        </form>`;
+      el.querySelector('#fform').addEventListener('submit', e => {
+        e.preventDefault();
+        const v = id => { const s = String(el.querySelector(id).value).trim().replace(',', '.'); if (!s) return null; const x = parseFloat(s); return isFinite(x) && x >= 0 ? x : NaN; };
+        const r = { k: v('#ff-k'), p: v('#ff-p'), f: v('#ff-f'), c: v('#ff-c') };
+        if (r.k == null) { toast('Введите хотя бы калории'); return; }
+        if ([r.k, r.p, r.f, r.c].some(x => Number.isNaN(x))) { toast('Только числа, например 540'); return; }
+        mutate(d => { d.fact = d.fact || {}; d.fact[mk] = r; });
+        closeSheet(); toast('Факт сохранён');
+      });
+      setTimeout(() => { const i = el.querySelector('#ff-k'); if (i && !f.k) i.focus(); }, 60);
+    },
+  });
+}
+
 // вкладка «Продукты»: одна категория за раз, по строке на продукт; подробности — по нажатию
-let prodCat = 'meat';
+let prodCat = 'main';
 // на что указаны значения: штучные из справочника — на 1 шт, свои штучные — на 100 г (+ вес штуки)
 function perLabel(p) { return p.u === 'pc' && !p.pw ? '1 ' + unitLabel(p) : (p.u === 'ml' || p.b === 'ml') ? '100 мл' : '100 г'; }
 function renderProducts() {
-  const mine = S.custom.filter(p => !p.hidden);
-  if (prodCat === 'mine' && !mine.length) prodCat = 'meat';
-  const chips = (mine.length ? [['mine', 'Мои']] : []).concat(GROUPS.filter(([g]) => allProducts().some(p => p.g === g)));
+  const mine = S.custom.filter(p => !p.hidden), favs = allProducts().filter(p => isFav(p.id));
+  if ((prodCat === 'mine' && !mine.length) || (prodCat === 'fav' && !favs.length)) prodCat = 'main';
+  const chips = (favs.length ? [['fav', '♥ Любимые']] : []).concat(mine.length ? [['mine', 'Мои']] : [], GROUPS.filter(([g]) => allProducts().some(p => p.g === g)));
+  const cnt = { fav: favs.length, mine: mine.length };
   // «на 100 г» — в шапке списка; в строке подпись только у штучных и жидких
-  const row = p => `<button class="lrow" data-act="pinfo" data-pid="${p.id}"><span class="ln">${esc(p.n)}${p.custom && prodCat !== 'mine' ? ' <span class="tag">моё</span>' : ''}</span><span class="la num">${p.u === 'g' ? '' : p.pw ? `1 шт = ${f0(p.pw)} г` : 'на ' + perLabel(p)}</span><span class="ld num">${f0(p.k)}</span></button>`;
-  const body = prodCat === 'mine'
-    ? GROUPS.map(([g, gn]) => [gn, mine.filter(p => p.g === g)]).filter(([, l]) => l.length).map(([gn, l]) => `<div class="sub-h">${gn}</div>` + l.map(row).join('')).join('')
+  const row = p => `<div class="lrow-w"><button class="lrow" data-act="pinfo" data-pid="${p.id}"><span class="ln">${esc(p.n)}${p.custom && prodCat !== 'mine' ? ' <span class="tag">моё</span>' : ''}</span><span class="la num">${p.u === 'g' ? '' : p.pw ? `1 шт = ${f0(p.pw)} г` : 'на ' + perLabel(p)}</span><span class="ld num">${f0(p.k)}</span></button>${heartBtn(p.id)}</div>`;
+  const byCatList = list => GROUPS.map(([g, gn]) => [gn, list.filter(p => p.g === g)]).filter(([, l]) => l.length).map(([gn, l]) => `<div class="sub-h">${gn}</div>` + l.map(row).join('')).join('');
+  const body = prodCat === 'mine' ? byCatList(mine) : prodCat === 'fav' ? byCatList(favs)
     : bySub(allProducts().filter(p => p.g === prodCat)).map(([sg, sl]) => subHead(sg) + sl.map(row).join('')).join('');
   return `<div class="ph"><h1 class="page-h">Продукты</h1><button class="addprod" data-act="np-open">${IC.plus}Свой продукт</button></div>
     <p class="page-sub">Нажмите на продукт — покажу белки, жиры и углеводы.</p>
-    <div class="gchips pchips">${chips.map(([k, n]) => `<button class="chip" data-act="pg" data-g="${k}" aria-pressed="${prodCat === k}">${n}${k === 'mine' ? ` <span class="num">${mine.length}</span>` : ''}</button>`).join('')}</div>
+    <div class="gchips pchips">${chips.map(([k, n]) => `<button class="chip" data-act="pg" data-g="${k}" aria-pressed="${prodCat === k}">${n}${cnt[k] ? ` <span class="num">${cnt[k]}</span>` : ''}</button>`).join('')}</div>
     <div class="card plist-card"><div class="list-h"><span>Продукт</span><span>ккал на 100 г</span></div>${body}</div>
     <p class="rule-hint page-foot">Значения примерные, точнее — по этикетке.</p>`;
 }
@@ -936,7 +1359,7 @@ function productSheet(pid) {
       const p = prod(pid); if (!p) return closeSheet();
       const where = [GNAME[p.g], p.sg && SGNAME[p.sg]].filter(Boolean).join(' · ');
       const weight = p.q ? `, вес ${p.q === 'сух.' ? 'сухой' : 'сырой'}` : '';
-      el.innerHTML = `<div class="sw-head"><span class="eyebrow">${esc(where)}</span><h3 class="sh-h">${esc(p.n)}</h3><p class="sh-sub">на ${perLabel(p)}${weight}</p></div>
+      el.innerHTML = `<div class="sw-head head-row"><div><span class="eyebrow">${esc(where)}</span><h3 class="sh-h">${esc(p.n)}</h3><p class="sh-sub">на ${perLabel(p)}${weight}</p></div>${heartBtn(p.id)}</div>
         <div class="nline num"><div><b>${f1(p.k)}</b><span>ккал</span></div><div><b class="k-p">${f1(p.p)}</b><span>белки</span></div><div><b class="k-f">${f1(p.f)}</b><span>жиры</span></div><div><b class="k-c">${f1(p.c)}</b><span>углев.</span></div></div>
         ${p.pw ? `<p class="rule-hint info-line num">1 шт = ${f0(p.pw)} г: ${f0(perUnit(p).k)} ккал · белок ${f1(Math.round(perUnit(p).p * 10) / 10)} г</p>` : ''}
         <p class="rule-hint info-line">Обычная порция: ${amountText(p, p.d || 100)} · ${f0(nutr(p.id, p.d || 100).k)} ккал${p.hint ? ' · ' + esc(p.hint) : ''}${p.norand ? ' · в случайное меню не попадает' : ''}</p>
@@ -998,7 +1421,7 @@ function productForm(pid) {
         el.querySelector('#pf-sg-wrap').hidden = !subs.length;
         const keep = keepSg || sgSel.value;
         sgSel.innerHTML = subs.map(s => `<option value="${s}" ${s === keep ? 'selected' : ''}>${SGNAME[s]}</option>`).join('');
-        const role = subs.length ? SG_ROLE[sgSel.value] : CAT_ROLE[g];
+        const role = roleOf(g, subs.length ? sgSel.value : '');
         el.querySelector('#pf-role').textContent = role ? 'В случайном меню: ' + role + '. Заменять можно на продукты из этой же категории.' : 'В случайное меню сам не попадает — добавляйте через «Добавить продукт» или замену.';
       };
       gSel.addEventListener('change', () => sync(''));
@@ -1029,7 +1452,7 @@ function saveProduct(ed, el) {
     st: pc ? (d % 1 ? 0.5 : 1) : d < 50 ? 5 : 10,
     q: g === 'meat' || g === 'fish' ? 'сыр.' : sg === 'grain' ? 'сух.' : undefined,
     dry: sg === 'grain' ? 1 : undefined,
-    fatty: PROTEIN_G.has(g) && f >= 6 ? 1 : undefined,
+    fatty: isProt({ g, sg }) && f >= 6 ? 1 : undefined,
     oil: sg === 'oil' ? 1 : undefined,
     norand: el.querySelector('#pf-rand').checked ? undefined : 1,
     hint: undefined,
@@ -1072,33 +1495,29 @@ function openSheet(build) {
 }
 function closeSheet() { sheetState = null; $sheet.hidden = true; $sheet.innerHTML = ''; }
 
-// окно количества: 'plan' — сколько запланировано, 'fact' — сколько съедено на самом деле
-function amountSheet(itemId, mode = 'plan') {
-  const isFact = mode === 'fact';
-  const cur = it => (isFact ? eatAmt(it) : it.a);
+// окно продукта в плане: порция, «в любимые», перенос в другой приём, удаление
+function amountSheet(itemId) {
   const st = {
-    mode, itemId,
+    itemId,
     draw(el) {
       const d = getDay(view.date), f = findItem(d, itemId);
       if (!f) return closeSheet();
-      const p = prod(f.it.p), base = isFact ? f.it.a : (p.d || 100);
-      st.planA = f.it.a;
-      st.presets = isFact
-        ? [...new Set([0.5, 0.75, 1, 1.25].map(m => roundStep(p.id, base * m)))]
-        : p.u === 'pc' ? (p.st < 1 ? [0.5, 1, 1.5, 2] : [1, 2, 3, 4, 5]) : [...new Set([0.5, 0.75, 1, 1.25, 1.5].map(m => roundStep(p.id, base * m)))];
+      const p = prod(f.it.p);
+      st.presets = p.u === 'pc' ? (p.st < 1 ? [0.5, 1, 1.5, 2] : [1, 2, 3, 4, 5]) : [...new Set([0.5, 0.75, 1, 1.25, 1.5].map(m => roundStep(p.id, (p.d || 100) * m)))];
       const meal = MEALS.find(m => m[0] === f.mk)[1];
-      const sub = isFact ? 'По плану ' + amountText(p, f.it.a) : p.q ? 'Вес ' + (p.q === 'сух.' ? 'сухой' : 'сырой') : 'Сколько запланировать';
-      el.innerHTML = `<div class="sw-head"><span class="eyebrow">${isFact ? 'Сколько съели' : meal}</span><h3 class="sh-h">${esc(p.n)}</h3><p class="sh-sub num">${sub}</p></div>
+      const others = MEALS.filter(([k]) => k !== f.mk);
+      el.innerHTML = `<div class="sw-head head-row"><div><span class="eyebrow">${meal}</span><h3 class="sh-h">${esc(p.n)}</h3><p class="sh-sub">${p.q ? 'Вес ' + (p.q === 'сух.' ? 'сухой' : 'сырой') : 'Сколько запланировать'}</p></div>${heartBtn(p.id)}</div>
         <div class="readout">
           <button class="rbtn" data-act="amt-step" data-d="-1" aria-label="Меньше">−</button>
-          <div class="scale"><input id="amt" type="number" inputmode="decimal" step="${p.st}" min="0" value="${cur(f.it)}" aria-label="Количество"><small id="amt-unit">${unitLabel(p)}${p.q ? ' ' + p.q : ''}</small></div>
+          <div class="scale"><input id="amt" type="number" inputmode="decimal" step="${p.st}" min="0" value="${f.it.a}" aria-label="Количество"><small id="amt-unit"></small></div>
           <button class="rbtn" data-act="amt-step" data-d="1" aria-label="Больше">+</button>
         </div>
         ${p.hint ? `<p class="hint">${esc(p.hint)}</p>` : ''}
         <div class="chips" id="amt-chips"></div>
         <div class="nline num" id="amt-n"></div>
-        ${isFact ? '' : '<div id="amt-fact"></div>'}
-        <div class="sh-actions">${isFact ? '<button class="ghost" data-act="fact-none">Не ел</button><button class="primary" data-act="fact-ok">Готово</button>' : '<button class="ghost" data-act="del-item">Удалить</button><button class="primary" data-act="close">Готово</button>'}</div>`;
+        <div class="sec-h">Перенести в</div>
+        <div class="chips move">${others.map(([k, n]) => `<button class="chip" data-act="move" data-meal="${k}">${n}</button>`).join('')}</div>
+        <div class="sh-actions"><button class="ghost" data-act="del-item">Удалить</button><button class="primary" data-act="close">Готово</button></div>`;
       st.refresh();
       const inp = el.querySelector('#amt');
       inp.addEventListener('input', () => {
@@ -1110,42 +1529,39 @@ function amountSheet(itemId, mode = 'plan') {
       const el = document.getElementById('sheet-body'); if (!el) return;
       const f = findItem(getDay(view.date), itemId);
       if (!f) return;
-      const p = prod(f.it.p), v = cur(f.it), n = nutr(f.it.p, v);
+      const p = prod(f.it.p), v = f.it.a, n = nutr(f.it.p, v);
       const inp = el.querySelector('#amt');
       if (inp && document.activeElement !== inp) inp.value = v;
       const u = el.querySelector('#amt-unit');
       if (u) u.textContent = unitLabel(p) + (p.q ? ' ' + p.q : '') + (p.pw ? ` · ${f0(v * p.pw)} г` : '');
       const chips = el.querySelector('#amt-chips');
-      if (chips) chips.innerHTML = (st.presets || []).map(x => `<button class="chip num" data-act="amt-set" data-v="${x}" aria-pressed="${x === v}">${isFact && x === st.planA ? 'по плану' : f1(x) + ' ' + unitLabel(p)}</button>`).join('');
+      if (chips) chips.innerHTML = (st.presets || []).map(x => `<button class="chip num" data-act="amt-set" data-v="${x}" aria-pressed="${x === v}">${f1(x)} ${unitLabel(p)}</button>`).join('');
       const nl = el.querySelector('#amt-n');
       if (nl) nl.innerHTML = `<div><b>${f0(n.k)}</b><span>ккал</span></div><div><b class="k-p">${f1(Math.round(n.p * 10) / 10)}</b><span>белки</span></div><div><b class="k-f">${f1(Math.round(n.f * 10) / 10)}</b><span>жиры</span></div><div><b class="k-c">${f1(Math.round(n.c * 10) / 10)}</b><span>углев.</span></div>`;
-      const fr = el.querySelector('#amt-fact');
-      if (fr) fr.innerHTML = f.it.done
-        ? `<button class="fact-row" data-act="fact" data-id="${f.it.id}"><span>Съедено: <b>${f.it.fact != null ? amountText(p, f.it.fact) : 'по плану'}</b></span><span class="linkbtn">Изменить</span></button>`
-        : `<button class="fact-row" data-act="fact" data-id="${f.it.id}"><span>Уже съели? Отметьте сколько</span><span class="linkbtn">Отметить</span></button>`;
+      const hb = el.querySelector('.heart');
+      if (hb) hb.outerHTML = heartBtn(p.id);
     },
   };
   openSheet(st);
 }
-// меняет то, что открыто в окне количества: план или факт
 function setQty(v) {
   const st = sheetState; if (!st || !st.itemId) return;
   v = Math.round(v * 100) / 100;
-  mutate(d => {
-    const f = findItem(d, st.itemId); if (!f) return;
-    if (st.mode === 'fact') { f.it.done = true; if (v === f.it.a) delete f.it.fact; else f.it.fact = v; }
-    else f.it.a = v;
-  });
+  mutate(d => { const f = findItem(d, st.itemId); if (f) f.it.a = v; });
+}
+// сердечко «в любимые»: любимое чаще попадает в случайное меню и первым идёт в советах
+function heartBtn(pid) {
+  const on = isFav(pid);
+  return `<button class="heart" data-act="fav" data-pid="${pid}" aria-pressed="${on}" aria-label="${on ? 'Убрать из любимых' : 'В любимые'}">${on ? IC.heartOn : IC.heart}</button>`;
 }
 
 // с какой категории открыть «Добавить»: для перекусов — перекусы, для основных приёмов — чего в приёме ещё нет
 function defaultCat(mk) {
   const arr = getDay(view.date).meals[mk] || [];
   const has = gs => arr.some(it => { const p = prod(it.p); return p && gs.includes(p.g); });
-  if (mk === 'snack' || mk === 'extra') return 'snack';
-  if (mk === 'breakfast') return !has(['dairy']) ? 'dairy' : !has(['garnish']) ? 'garnish' : 'fruit';
-  const main = mk === 'dinner' ? 'fish' : 'meat';
-  return !has(['meat', 'fish', 'dairy']) ? main : !has(['garnish']) ? 'garnish' : !has(['veg']) ? 'veg' : main;
+  if (mk === 'snack') return 'snack';
+  if (mk === 'breakfast') return !has(['bfast', 'dairy']) ? 'bfast' : !has(['garnish']) ? 'garnish' : 'fruit';
+  return !has(['main']) ? 'main' : !has(['garnish']) ? 'garnish' : !has(['veg']) ? 'veg' : 'main';
 }
 function addSheet(mk) {
   let q = '', g = defaultCat(mk);
@@ -1163,11 +1579,12 @@ function addSheet(mk) {
     list() {
       const gc = document.getElementById('add-g'), box = document.getElementById('add-list');
       if (!gc || !box) return;
-      gc.innerHTML = GROUPS.filter(([k]) => allProducts().some(p => p.g === k))
+      const hasFav = allProducts().some(p => isFav(p.id));
+      gc.innerHTML = (hasFav ? [['fav', '♥ Любимые']] : []).concat(GROUPS.filter(([k]) => allProducts().some(p => p.g === k)))
         .map(([k, n]) => `<button class="chip" data-act="add-g" data-g="${k}" aria-pressed="${g === k}">${n}</button>`).join('');
       const sel = gc.querySelector('[aria-pressed="true"]');
       if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: 'nearest', inline: 'center' });
-      const list = allProducts().filter(p => p.g === g && (!q || p.n.toLowerCase().includes(q)));
+      const list = allProducts().filter(p => (g === 'fav' ? isFav(p.id) : p.g === g) && (!q || p.n.toLowerCase().includes(q)));
       if (!list.length) {
         box.innerHTML = `<p class="rule-hint">В категории «${GNAME[g]}» такого нет.</p>`;
         return;
@@ -1175,7 +1592,7 @@ function addSheet(mk) {
       const lu = lastUsed(view.date), inDay = idsInDay(getDay(view.date));
       const rec = q ? [] : (recCache[g] || (recCache[g] = recommend(g, view.date, null, 2)));
       const card = p => { const a = addAmount(p); return `<button class="sg-card" data-act="pick" data-pid="${p.id}"><span class="sg-main"><b>${esc(p.n)}</b><span class="num">${amountText(p, a)} · ${whyText(lu, p.id, view.date)}</span></span><span class="pill num">${f0(nutr(p.id, a).k)} ккал</span></button>`; };
-      const row = p => { const a = addAmount(p); return `<button class="lrow ${inDay.has(p.id) ? 'dim' : ''}" data-act="pick" data-pid="${p.id}"><span class="ln">${esc(p.n)}</span><span class="la num">${amountText(p, a)}</span><span class="ld num">${f0(nutr(p.id, a).k)}</span></button>`; };
+      const row = p => { const a = addAmount(p); return `<button class="lrow ${inDay.has(p.id) ? 'dim' : ''}" data-act="pick" data-pid="${p.id}"><span class="ln">${isFav(p.id) ? '<span class="favdot">♥</span>' : ''}${esc(p.n)}</span><span class="la num">${amountText(p, a)}</span><span class="ld num">${f0(nutr(p.id, a).k)}</span></button>`; };
       const rest = list.filter(p => !rec.includes(p.id));
       box.innerHTML = (rec.length ? `<div class="sec-h">Советуем</div><div class="sugg">${rec.map(id => card(prod(id))).join('')}</div>` : '')
         + `<div class="list-h"><span>${q ? 'Найдено' : 'Все в категории'}</span><span>ккал</span></div>`
@@ -1218,7 +1635,7 @@ function kDiff(dk) {
 }
 function ruleHint(p, cur) {
   const tail = ', но так, чтобы день не вышел за цель по калориям';
-  if (PROTEIN_G.has(p.g)) return `Порции — на те же ${f0(cur.p)} г белка` + tail;
+  if (isProt(p)) return `Порции — на те же ${f0(cur.p)} г белка` + tail;
   if (p.dry) return 'Крупы — тот же сухой вес, остальное — те же калории' + tail;
   if (p.g === 'veg') return 'Порции — тот же вес';
   return `Порции — на те же ${f0(cur.k)} ккал` + tail;
@@ -1238,7 +1655,7 @@ function swapSheet(itemId) {
         const [id, a] = o.items[0], x = prod(id), [cls, txt] = kDiff(nutr(id, a).k - cur.k);
         const why = o.sec === 'plan' ? 'по плану' : o.why;
         // честно показываем, если ради калорий пришлось урезать белок
-        const pShort = PROTEIN_G.has(p.g) ? cur.p - nutr(id, a).p : 0;
+        const pShort = isProt(p) ? cur.p - nutr(id, a).p : 0;
         const warn = pShort >= 5 ? ` · <span class="warn-t">белка меньше на ${f0(pShort)} г</span>` : '';
         return `<button class="sg-card" data-act="do-swap" data-pid="${id}" data-a="${a}"><span class="sg-main"><b>${esc(o.note || x.n)}</b><span class="num">${amountText(x, a)}${why ? ' · ' + why : ''}${warn}</span></span><span class="pill num ${cls}">${txt}</span></button>`;
       };
@@ -1263,14 +1680,14 @@ function swapSheet(itemId) {
       gc.innerHTML = cats.map(([k, n]) => `<button class="chip" data-act="sw-g" data-g="${k}" aria-pressed="${!q && cat === k}">${n}</button>`).join('');
       const row = x => {
         const a = fitAmount(f.it, x.id, room), [cls, , short] = kDiff(nutr(x.id, a).k - cur.k);
-        return `<button class="lrow ${inDay.has(x.id) ? 'dim' : ''}" data-act="do-swap" data-pid="${x.id}" data-a="${a}"><span class="ln">${esc(x.n)}</span><span class="la num">${amountText(x, a)}</span><span class="ld num ${cls}">${short}</span></button>`;
+        return `<button class="lrow ${inDay.has(x.id) ? 'dim' : ''}" data-act="do-swap" data-pid="${x.id}" data-a="${a}"><span class="ln">${isFav(x.id) ? '<span class="favdot">♥</span>' : ''}${esc(x.n)}</span><span class="la num">${amountText(x, a)}</span><span class="ld num ${cls}">${short}</span></button>`;
       };
       const pool = allProducts().filter(x => x.id !== p.id && (q ? x.n.toLowerCase().includes(q) : x.g === cat && !st.top.has(x.id)));
       if (!pool.length) { box.innerHTML = `<p class="rule-hint">Ничего не нашлось.</p>`; return; }
       const groups = q
         ? GROUPS.map(([g, gn]) => [gn, pool.filter(x => x.g === g)]).filter(([, l]) => l.length).map(([gn, l]) => `<div class="sub-h">${gn}</div>` + l.map(row).join(''))
         : bySub(pool, cat === p.g ? p.sg : '').map(([sg, sl]) => subHead(sg) + sl.map(row).join(''));
-      const byProt = PROTEIN_G.has(p.g) && PROTEIN_G.has(cat);
+      const byProt = isProt(p) && (cat === 'dairy' || cat === 'main');
       const note = !q && cat !== p.g ? `<p class="rule-hint" style="margin:0 2px 6px">Из другой категории порция подобрана ${byProt ? 'на тот же белок' : 'по калориям'}</p>` : '';
       box.innerHTML = note + `<div class="list-h"><span>Продукт и порция</span><span>ккал</span></div>` + groups.join('');
     },
@@ -1334,17 +1751,19 @@ document.addEventListener('click', e => {
     case 'prev': view.date = clampDate(shiftKey(view.date, -1)); render(); break;
     case 'next': view.date = clampDate(shiftKey(view.date, 1)); render(); break;
     case 'today': view.date = todayKey(); render(); break;
-    case 'toggle': {
-      // одно касание — «съедено по плану»; сколько на самом деле — по кнопке в подсказке или нажатием на продукт
-      const id = b.dataset.id; let nowDone = false;
-      mutate(d => { const f = findItem(d, id); if (!f) return; f.it.done = !f.it.done; delete f.it.fact; nowDone = f.it.done; });
-      if (nowDone) toast('Съедено по плану', false, { label: 'Съел другое количество', act: 'fact', data: { id } });
-      else hideToast();
-      break;
+    case 'toggle': mutate(d => { const f = findItem(d, b.dataset.id); if (f) f.it.done = !f.it.done; }); break;
+    case 'mfact': factSheet(b.dataset.meal); break;
+    case 'mfact-clear': { const mk = b.dataset.meal; mutate(d => { if (d.fact) delete d.fact[mk]; }); closeSheet(); toast('Факт очищен'); break; }
+    case 'move': {
+      const to = b.dataset.meal, id = sheetState.itemId;
+      mutate(d => { const f = findItem(d, id); if (!f) return; f.arr.splice(f.i, 1); (d.meals[to] = d.meals[to] || []).push(f.it); }, true);
+      closeSheet(); toast('Перенесено: ' + MEALS.find(m => m[0] === to)[1], true); break;
     }
-    case 'fact': hideToast(); amountSheet(b.dataset.id, 'fact'); break;
-    case 'fact-ok': { const id = sheetState.itemId; mutate(d => { const f = findItem(d, id); if (f) f.it.done = true; }); closeSheet(); break; }
-    case 'fact-none': { const id = sheetState.itemId; mutate(d => { const f = findItem(d, id); if (f) { f.it.done = false; delete f.it.fact; } }); closeSheet(); toast('Отметка снята'); break; }
+    case 'fav': {
+      const id = b.dataset.pid; S.fav = S.fav || {};
+      if (S.fav[id]) delete S.fav[id]; else S.fav[id] = 1;
+      commit(); toast(S.fav[id] ? 'В любимых — будет чаще в меню' : 'Убрано из любимых'); break;
+    }
     case 'amount': amountSheet(b.dataset.id); break;
     case 'swap': swapSheet(b.dataset.id); break;
     case 'do-swap': doSwap(b.dataset.pid, +b.dataset.a); break;
@@ -1359,7 +1778,7 @@ document.addEventListener('click', e => {
     }
     case 'amt-step': {
       const f = findItem(getDay(view.date), sheetState.itemId); if (!f) break;
-      const p = prod(f.it.p), now = sheetState.mode === 'fact' ? eatAmt(f.it) : f.it.a;
+      const p = prod(f.it.p), now = f.it.a;
       setQty(Math.max(0, now + p.st * +b.dataset.d)); break;
     }
     case 'amt-set': setQty(+b.dataset.v); break;
