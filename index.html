@@ -1207,50 +1207,71 @@ function ruleHint(p, cur) {
   return `Порции — на те же ${f0(cur.k)} ккал` + tail;
 }
 function swapSheet(itemId) {
-  let open = false;
+  let open = false, cat = null, q = '';
   const st = {
     draw(el) {
       const d = getDay(view.date), f = findItem(d, itemId);
       if (!f) return closeSheet();
       const p = prod(f.it.p), cur = itemN(f.it);
-      const opts = st.opts || (st.opts = swapOptions(f.it)); // один раз: рекомендации не прыгают при раскрытии списка
-      const idx = opts.map((o, i) => [o, i]);
-      const top = [...idx.filter(([o]) => o.sec === 'plan').slice(0, 1), ...idx.filter(([o]) => o.sec === 'rec')].slice(0, 3);
-      const topSet = new Set(top.map(([, i]) => i));
-      const rest = idx.filter(([, i]) => !topSet.has(i));
-      const subs = [...new Set(rest.map(([o]) => o.sg))].sort((a, b) => (a === (p.sg || '') ? -1 : b === (p.sg || '') ? 1 : SG_ORDER.indexOf(a) - SG_ORDER.indexOf(b)));
-      const dkOf = o => nutr(o.items[0][0], o.items[0][1]).k - cur.k;
-      const card = ([o, i]) => {
-        const x = prod(o.items[0][0]), [cls, txt] = kDiff(dkOf(o));
+      if (!cat) cat = p.g;
+      const opts = st.opts || (st.opts = swapOptions(f.it)); // один раз: советы не прыгают при раскрытии списка
+      const top = [...opts.filter(o => o.sec === 'plan').slice(0, 1), ...opts.filter(o => o.sec === 'rec')].slice(0, 3);
+      st.top = new Set(top.map(o => o.items[0][0]));
+      const card = o => {
+        const [id, a] = o.items[0], x = prod(id), [cls, txt] = kDiff(nutr(id, a).k - cur.k);
         const why = o.sec === 'plan' ? 'по плану' : o.why;
         // честно показываем, если ради калорий пришлось урезать белок
-        const pShort = PROTEIN_G.has(p.g) ? cur.p - nutr(o.items[0][0], o.items[0][1]).p : 0;
+        const pShort = PROTEIN_G.has(p.g) ? cur.p - nutr(id, a).p : 0;
         const warn = pShort >= 5 ? ` · <span class="warn-t">белка меньше на ${f0(pShort)} г</span>` : '';
-        return `<button class="sg-card" data-act="do-swap" data-i="${i}"><span class="sg-main"><b>${esc(o.note || x.n)}</b><span class="num">${amountText(x, o.items[0][1])}${why ? ' · ' + why : ''}${warn}</span></span><span class="pill num ${cls}">${txt}</span></button>`;
-      };
-      const row = ([o, i]) => {
-        const x = prod(o.items[0][0]), [cls, , short] = kDiff(dkOf(o));
-        return `<button class="lrow ${o.today ? 'dim' : ''}" data-act="do-swap" data-i="${i}"><span class="ln">${esc(x.n)}</span><span class="la num">${amountText(x, o.items[0][1])}</span><span class="ld num ${cls}">${short}</span></button>`;
+        return `<button class="sg-card" data-act="do-swap" data-pid="${id}" data-a="${a}"><span class="sg-main"><b>${esc(o.note || x.n)}</b><span class="num">${amountText(x, a)}${why ? ' · ' + why : ''}${warn}</span></span><span class="pill num ${cls}">${txt}</span></button>`;
       };
       el.innerHTML = `<div class="sw-head"><span class="eyebrow">Замена</span><h3 class="sh-h">${esc(p.n)}</h3><p class="sh-sub num">${amountText(p, f.it.a)} · ${f0(cur.k)} ккал</p></div>
         ${top.length ? `<div class="sec-h">Советуем</div><div class="sugg">${top.map(card).join('')}</div>` : ''}
         <p class="rule-hint">${ruleHint(p, cur)}</p>
-        ${rest.length ? `<button class="more-btn" data-act="sw-more" aria-expanded="${open || !top.length}"><span>Все варианты <span class="cnt num">${rest.length}</span></span>${IC.chev}</button>` : ''}
-        ${open || !top.length ? `<div class="list-h"><span>Продукт и порция</span><span>ккал</span></div>` + subs.map(sg => subHead(sg) + rest.filter(([o]) => o.sg === sg).map(row).join('')).join('') : ''}`;
+        <button class="more-btn" data-act="sw-more" aria-expanded="${open}"><span>Любой другой продукт</span>${IC.chev}</button>
+        ${open ? `<div class="gchips" id="sw-g"></div><input class="search" id="sw-q" type="search" placeholder="Поиск по всем продуктам" autocomplete="off" value="${esc(q)}"><div id="sw-rows"></div>` : ''}`;
+      if (open) {
+        el.querySelector('#sw-q').addEventListener('input', e => { q = e.target.value.trim().toLowerCase(); st.list(); });
+        st.list();
+      }
+    },
+    // список: выбранная категория (сначала — своя), а при поиске — все категории сразу
+    list() {
+      const gc = document.getElementById('sw-g'), box = document.getElementById('sw-rows');
+      if (!gc || !box) return;
+      const d = getDay(view.date), f = findItem(d, itemId); if (!f) return;
+      const p = prod(f.it.p), cur = itemN(f.it), room = slotRoom(d, f.it), inDay = idsInDay(d);
+      const cats = GROUPS.filter(([g]) => allProducts().some(x => x.g === g));
+      cats.sort((a, b) => (a[0] === p.g ? -1 : b[0] === p.g ? 1 : 0));
+      gc.innerHTML = cats.map(([k, n]) => `<button class="chip" data-act="sw-g" data-g="${k}" aria-pressed="${!q && cat === k}">${n}</button>`).join('');
+      const row = x => {
+        const a = fitAmount(f.it, x.id, room), [cls, , short] = kDiff(nutr(x.id, a).k - cur.k);
+        return `<button class="lrow ${inDay.has(x.id) ? 'dim' : ''}" data-act="do-swap" data-pid="${x.id}" data-a="${a}"><span class="ln">${esc(x.n)}</span><span class="la num">${amountText(x, a)}</span><span class="ld num ${cls}">${short}</span></button>`;
+      };
+      const pool = allProducts().filter(x => x.id !== p.id && (q ? x.n.toLowerCase().includes(q) : x.g === cat && !st.top.has(x.id)));
+      if (!pool.length) { box.innerHTML = `<p class="rule-hint">Ничего не нашлось.</p>`; return; }
+      const groups = q
+        ? GROUPS.map(([g, gn]) => [gn, pool.filter(x => x.g === g)]).filter(([, l]) => l.length).map(([gn, l]) => `<div class="sub-h">${gn}</div>` + l.map(row).join(''))
+        : bySub(pool, cat === p.g ? p.sg : '').map(([sg, sl]) => subHead(sg) + sl.map(row).join(''));
+      const byProt = PROTEIN_G.has(p.g) && PROTEIN_G.has(cat);
+      const note = !q && cat !== p.g ? `<p class="rule-hint" style="margin:0 2px 6px">Из другой категории порция подобрана ${byProt ? 'на тот же белок' : 'по калориям'}</p>` : '';
+      box.innerHTML = note + `<div class="list-h"><span>Продукт и порция</span><span>ккал</span></div>` + groups.join('');
     },
     toggle() { open = !open; st.draw(document.getElementById('sheet-body')); },
+    setG(g) { cat = g; q = ''; const s = document.getElementById('sw-q'); if (s) s.value = ''; st.list(); },
   };
   st.itemId = itemId;
   openSheet(st);
 }
-function doSwap(i) {
-  const st = sheetState; if (!st || !st.opts) return;
-  const [pid, a] = st.opts[i].items[0], id = st.itemId;
+function doSwap(pid, a) {
+  const st = sheetState; if (!st || !st.itemId || !prod(pid)) return;
+  const id = st.itemId;
   let oilMeal = null;
   mutate(d => {
     const f = findItem(d, id); if (!f) return;
-    const wasFatty = !!prod(f.it.p).fatty;
-    f.arr[f.i] = { id: uid(), p: pid, a, done: false }; // меняется только эта позиция
+    const wasFatty = !!prod(f.it.p).fatty, extra = !!f.it.extra;
+    // меняется только эта позиция; «съел сверх плана» остаётся съеденным
+    f.arr[f.i] = { id: uid(), p: pid, a, done: extra, ...(extra ? { extra: true } : {}) };
     if (prod(pid).fatty && !wasFatty && f.arr.some(x => prod(x.p) && prod(x.p).oil)) oilMeal = f.mk;
   }, true);
   closeSheet();
@@ -1309,7 +1330,8 @@ document.addEventListener('click', e => {
     case 'fact-none': { const id = sheetState.itemId; mutate(d => { const f = findItem(d, id); if (f) { f.it.done = false; delete f.it.fact; } }); closeSheet(); toast('Отметка снята'); break; }
     case 'amount': amountSheet(b.dataset.id); break;
     case 'swap': swapSheet(b.dataset.id); break;
-    case 'do-swap': doSwap(+b.dataset.i); break;
+    case 'do-swap': doSwap(b.dataset.pid, +b.dataset.a); break;
+    case 'sw-g': sheetState && sheetState.setG && sheetState.setG(b.dataset.g); break;
     case 'sw-more': sheetState && sheetState.toggle && sheetState.toggle(); break;
     case 'add': addSheet(b.dataset.meal); break;
     case 'add-g': sheetState && sheetState.setG && sheetState.setG(b.dataset.g); break;
