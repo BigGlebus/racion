@@ -237,6 +237,11 @@ input, select { font: inherit; color: inherit; }
 .check input { width: 20px; height: 20px; accent-color: var(--accent); flex: none; }
 .ghost.wide { width: 100%; }
 /* план / факт: сводка дня и таблица приёма */
+.segs { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; border-radius: 12px; background: var(--surface-2); }
+.segs button { padding: 7px 8px; border-radius: 9px; font-weight: 600; font-size: 13.5px; color: var(--muted); }
+.segs button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
+.segs .num { font-weight: 500; font-size: 12px; color: var(--muted); margin-left: 3px; }
+.sum-note { margin: 0; font-size: 12.5px; color: var(--muted); }
 .kline .eyebrow { align-self: center; margin-right: 2px; }
 .factline { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; font-size: 13px; color: var(--muted); padding-top: 8px; border-top: 1px solid var(--line); }
 .factline b { font-family: var(--f-display); font-size: 18px; color: var(--ink); }
@@ -1199,13 +1204,14 @@ function statusOf(v, lo, hi, min) {
   if (v > hi * 1.05) return ['high', 'много'];
   return ['ok', 'норма'];
 }
+// v = null — показатель не вносили: прочерк без оценки
 function macroBlock(cls, letter, v, range, min) {
   const [lo, hi] = range;
   const max = hi * 1.3;
-  const [st, txt] = statusOf(v, lo, hi, min);
+  const [st, txt] = v == null ? ['', 'не внесено'] : statusOf(v, lo, hi, min);
   return `<div class="mac">
-    <div class="ml"><b class="k-${cls}">${letter}</b><span class="v num">${f0(v)}</span><small class="num">/ ${lo}–${hi}</small></div>
-    <div class="mbar"><span class="zone" style="left:${lo / max * 100}%;width:${(hi - lo) / max * 100}%"></span><i class="b-${cls}" style="width:${Math.min(100, v / max * 100)}%"></i></div>
+    <div class="ml"><b class="k-${cls}">${letter}</b><span class="v num">${v == null ? '—' : f0(v)}</span><small class="num">/ ${lo}–${hi}</small></div>
+    <div class="mbar"><span class="zone" style="left:${lo / max * 100}%;width:${(hi - lo) / max * 100}%"></span><i class="b-${cls}" style="width:${v == null ? 0 : Math.min(100, v / max * 100)}%"></i></div>
     <span class="st ${st}">${txt}</span>
   </div>`;
 }
@@ -1225,9 +1231,12 @@ function renderDay() {
   const k = view.date, d = getDay(k), T = S.targets;
   const { t } = dayTotals(d), F = dayFact(d);
   const [hint, isToday] = dateHint(k);
-  const left = T.k - t.k;
+  // сводка показывает план или факт — переключатель над цифрами
+  const isF = view.sum === 'fact';
+  const V = isF ? { k: F.t.k, p: F.has.p ? F.t.p : null, f: F.has.f ? F.t.f : null, c: F.has.c ? F.t.c : null } : t;
+  const left = T.k - V.k;
   const scaleMax = Math.max(T.k * 1.15, t.k, F.t.k);
-  const leftTxt = Math.abs(left) <= 50 ? 'в цели' : left > 0 ? 'ещё ' + f0(left) : 'перебор ' + f0(-left);
+  const leftTxt = isF && !F.n ? 'не внесён' : Math.abs(left) <= 50 ? 'в цели' : left > 0 ? 'ещё ' + f0(left) : 'перебор ' + f0(-left);
   let h = `<header class="top">
     <div class="datebar">
       <button class="iconbtn" data-act="prev" aria-label="Предыдущий день" ${k <= shiftKey(todayKey(), -1) ? 'disabled' : ''}>${IC.prev}</button>
@@ -1236,16 +1245,18 @@ function renderDay() {
       <button class="iconbtn" data-act="daymenu" aria-label="Действия с днём">${IC.more}</button>
     </div>
     <div class="sum">
-      <div class="kline"><span class="eyebrow">План</span><span class="big num">${f0(t.k)}</span><span class="of num">/ ${f0(T.k)} ккал</span><span class="left num ${left < -50 ? 'over' : ''}">${leftTxt}</span></div>
+      <div class="segs" role="tablist">
+        <button role="tab" data-act="sum" data-v="plan" aria-selected="${!isF}">План</button>
+        <button role="tab" data-act="sum" data-v="fact" aria-selected="${isF}">Факт <span class="num">${F.n} из ${MEALS.length}</span></button>
+      </div>
+      <div class="kline"><span class="big num">${isF && !F.n ? '—' : f0(V.k)}</span><span class="of num">/ ${f0(T.k)} ккал</span><span class="left num ${left < -50 ? 'over' : ''}">${leftTxt}</span></div>
       <div class="bar" role="img" aria-label="План ${f0(t.k)}, факт ${f0(F.t.k)} из ${f0(T.k)} ккал"><i class="plan" style="width:${t.k / scaleMax * 100}%"></i><i class="eaten" style="width:${F.t.k / scaleMax * 100}%"></i><span class="tick" style="left:${T.k / scaleMax * 100}%"></span></div>
       <div class="macros">
-        ${macroBlock('p', 'Б', t.p, T.p)}
-        ${macroBlock('f', 'Ж', t.f, T.f, T.fMin)}
-        ${macroBlock('c', 'У', t.c, T.c)}
+        ${macroBlock('p', 'Б', V.p, T.p)}
+        ${macroBlock('f', 'Ж', V.f, T.f, T.fMin)}
+        ${macroBlock('c', 'У', V.c, T.c)}
       </div>
-      <div class="factline num ${F.n ? '' : 'empty'}"><span class="eyebrow">Факт</span>${F.n
-        ? `<b>${f0(F.t.k)}</b><span>ккал${['p', 'f', 'c'].map(m => F.has[m] ? ` · ${{ p: 'Б', f: 'Ж', c: 'У' }[m]} ${f0(F.t[m])}` : '').join('')}</span><span class="fcount">${F.n} из ${MEALS.length}</span>`
-        : '<span>внесите по приёмам — кнопка «Факт» под каждым</span>'}</div>
+      ${isF ? `<p class="sum-note">${F.n ? (F.n < MEALS.length ? `Внесено ${F.n} из ${MEALS.length} приёмов — оценка по тому, что уже внесено` : 'Внесены все приёмы') : 'Факт ещё не внесён — кнопка «Факт» под каждым приёмом'}</p>` : ''}
     </div>
     ${d.gen ? `<div class="draftnote"><span>Случайное меню: сначала любимое и то, чего давно не было</span><button class="linkbtn" data-act="regen">Другое меню</button></div>`
       : (!S.days[k] && k < todayKey()) ? `<div class="draftnote"><span>За этот день ничего не записано</span><button class="linkbtn" data-act="regen">Составить меню</button></div>` : ''}
@@ -1736,6 +1747,7 @@ document.addEventListener('click', e => {
     case 'today': view.date = todayKey(); render(); break;
     case 'toggle': mutate(d => { const f = findItem(d, b.dataset.id); if (f) f.it.done = !f.it.done; }); break;
     case 'mfact': factSheet(b.dataset.meal); break;
+    case 'sum': view.sum = b.dataset.v; render(); break;
     case 'mfact-clear': { const mk = b.dataset.meal; mutate(d => { if (d.fact) delete d.fact[mk]; }); closeSheet(); toast('Факт очищен'); break; }
     case 'move': {
       const to = b.dataset.meal, id = sheetState.itemId;
