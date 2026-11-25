@@ -1,5 +1,5 @@
 // «Рацион дня» — офлайн-кэш. Версия ставится сборкой (tools/build.mjs).
-const VERSION = 'racion-24.11-9f96e2';
+const VERSION = 'racion-25.11-7423b5';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {
@@ -11,6 +11,9 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
+  // кэшируем только своё, библиотеку чтения PDF и шрифты; отчёты FatSecret всегда свежие, мимо кэша
+  const host = new URL(req.url).host;
+  if (host !== self.location.host && !/cdnjs\.cloudflare\.com|fonts\.(googleapis|gstatic)\.com/.test(host)) return;
   e.respondWith(caches.open(VERSION).then(async (cache) => {
     const hit = await cache.match(req, { ignoreSearch: true });
     const own = new URL(req.url).origin === self.location.origin;

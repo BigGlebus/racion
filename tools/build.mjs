@@ -66,6 +66,9 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
+  // кэшируем только своё, библиотеку чтения PDF и шрифты; отчёты FatSecret всегда свежие, мимо кэша
+  const host = new URL(req.url).host;
+  if (host !== self.location.host && !/cdnjs\\.cloudflare\\.com|fonts\\.(googleapis|gstatic)\\.com/.test(host)) return;
   e.respondWith(caches.open(VERSION).then(async (cache) => {
     const hit = await cache.match(req, { ignoreSearch: true });
     const own = new URL(req.url).origin === self.location.origin;
