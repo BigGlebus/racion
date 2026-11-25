@@ -13,7 +13,7 @@
 <link rel="icon" href="icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
-<script>window.APP_VERSION = "25.11-e326bd";</script>
+<script>window.APP_VERSION = "25.11-0e009a";</script>
 <title>Рацион дня</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
@@ -32,9 +32,10 @@
   --accent: #2E7A4B;
   --accent-ink: #FFFFFF;
   --accent-soft: #D6EADB;
-  --prot: #3461C9;
-  --fat: #B9800A;
-  --carb: #B4502C;
+  --kcal: #4a3aa7;
+  --prot: #2a78d6;
+  --fat: #a8326a;
+  --carb: #199e70;
   --warn: #A8680F;
   --bad: #BF3434;
   /* уровни отклонения: недобор — красный/светло-красный, перебор — жёлтый/оранжевый */
@@ -48,7 +49,7 @@
   :root:not([data-theme="light"]) {
     --bg: #101512; --surface: #19201B; --surface-2: #232C25; --ink: #E7EDE8; --muted: #95A399;
     --line: #2C372F; --accent: #5CBB81; --accent-ink: #0C1A11; --accent-soft: #1E3828;
-    --prot: #82A1F2; --fat: #E6B54A; --carb: #E38763; --warn: #E3A948; --bad: #F07272; --u2: #F25C5C; --u1: #F2A3A3; --o1: #F2CD4A; --o2: #F59A45;
+    --kcal: #654abb; --prot: #3295f6; --fat: #df5e97; --carb: #168f70; --warn: #E3A948; --bad: #F07272; --u2: #F25C5C; --u1: #F2A3A3; --o1: #F2CD4A; --o2: #F59A45;
     --scrim: rgba(0, 0, 0, .6); --shadow: 0 1px 2px rgba(0, 0, 0, .3);
     color-scheme: dark;
   }
@@ -56,7 +57,7 @@
 :root[data-theme="dark"] {
   --bg: #101512; --surface: #19201B; --surface-2: #232C25; --ink: #E7EDE8; --muted: #95A399;
   --line: #2C372F; --accent: #5CBB81; --accent-ink: #0C1A11; --accent-soft: #1E3828;
-  --prot: #82A1F2; --fat: #E6B54A; --carb: #E38763; --warn: #E3A948; --bad: #F07272; --u2: #F25C5C; --u1: #F2A3A3; --o1: #F2CD4A; --o2: #F59A45;
+  --kcal: #654abb; --prot: #3295f6; --fat: #df5e97; --carb: #168f70; --warn: #E3A948; --bad: #F07272; --u2: #F25C5C; --u1: #F2A3A3; --o1: #F2CD4A; --o2: #F59A45;
   --scrim: rgba(0, 0, 0, .6); --shadow: 0 1px 2px rgba(0, 0, 0, .3);
   color-scheme: dark;
 }
@@ -118,7 +119,6 @@ body.sheet-open { overflow: hidden; }
 .draftnote::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: none; }
 .draftnote span { min-width: 0; }
 .draftnote .linkbtn { margin-left: auto; white-space: nowrap; font-size: 13px; padding: 4px 0; }
-.why { color: var(--accent); font-weight: 600; }
 
 /* приёмы пищи */
 .meals { display: grid; gap: 14px; padding-top: 4px; }
@@ -488,6 +488,57 @@ body.sheet-open { overflow: hidden; }
 .wrow .mn { display: grid; }
 .mn small { font-size: 11px; color: var(--muted); font-weight: 500; }
 .dlt { display: block; font-size: 10.5px; color: var(--muted); font-weight: 500; }
+/* цвета показателей (КБЖУ) — проверены на различимость, в т.ч. при дальтонизме; не пересекаются с цветами уровней */
+.sw { display: inline-block; flex: none; width: 10px; height: 10px; border-radius: 50%; }
+.sw.m-k { background: var(--kcal); } .sw.m-p { background: var(--prot); } .sw.m-f { background: var(--fat); } .sw.m-c { background: var(--carb); }
+/* разбор: карточка показателя «Почему так» → «Что исправить» */
+.why-h .sw { margin-right: -2px; }
+.why-h .stp { margin-right: 0; }
+.whyc.calm { padding-block: 10px; }
+.wsec { margin-top: 10px; }
+.wsec h3 { margin: 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.whyc .wsec ul { margin-top: 4px; }
+.whyc li small { color: var(--muted); font-size: 12px; }
+.wsec.fix li::marker { color: var(--accent); }
+.gain { display: inline-block; font-size: 12px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+.wnote { margin: 8px 0 0; font-size: 12.5px; color: var(--muted); }
+.warns ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 13.5px; }
+.warns .rule-hint { margin-top: 8px; }
+/* динамика: линии КБЖУ */
+.mlegend { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.mchip { display: grid; grid-template-columns: 10px minmax(0, 1fr); align-items: center; column-gap: 7px; min-width: 0; padding: 7px 10px; border-radius: 12px; background: var(--surface-2); font-size: 13.5px; font-weight: 600; text-align: left; }
+.mchip span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mchip small { grid-column: 2; color: var(--muted); font-size: 11.5px; font-weight: 500; white-space: nowrap; }
+.mchip[aria-pressed="false"] { background: transparent; box-shadow: inset 0 0 0 1px var(--line); color: var(--muted); }
+.mchip[aria-pressed="false"] .sw { opacity: .3; }
+.lchart .ln { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.ln-k { stroke: var(--kcal); } .ln-p { stroke: var(--prot); } .ln-f { stroke: var(--fat); } .ln-c { stroke: var(--carb); }
+.lchart .pt { stroke: var(--surface); stroke-width: 1.5; }
+.lchart .pt.hollow { fill: var(--surface); stroke-width: 2; }
+.lchart .pt.hollow.ln-k { stroke: var(--kcal); } .lchart .pt.hollow.ln-p { stroke: var(--prot); } .lchart .pt.hollow.ln-f { stroke: var(--fat); } .lchart .pt.hollow.ln-c { stroke: var(--carb); }
+.dsel-h small { color: var(--muted); font-weight: 500; font-size: 12px; }
+.pt-k { fill: var(--kcal); } .pt-p { fill: var(--prot); } .pt-f { fill: var(--fat); } .pt-c { fill: var(--carb); }
+.lchart .br { stroke-width: 3; stroke-linecap: round; }
+.br-k { stroke: var(--kcal); } .br-p { stroke: var(--prot); } .br-f { stroke: var(--fat); } .br-c { stroke: var(--carb); }
+.bd-k { fill: color-mix(in srgb, var(--kcal) 14%, transparent); } .bd-p { fill: color-mix(in srgb, var(--prot) 14%, transparent); }
+.bd-f { fill: color-mix(in srgb, var(--fat) 14%, transparent); } .bd-c { fill: color-mix(in srgb, var(--carb) 14%, transparent); }
+.lchart .ring { fill: var(--surface); stroke-width: 2.5; }
+.ring.lv-u2 { stroke: var(--u2); } .ring.lv-u1 { stroke: var(--u1); } .ring.lv-o1 { stroke: var(--o1); } .ring.lv-o2 { stroke: var(--o2); }
+.chart .grid.ref { stroke: var(--muted); stroke-dasharray: 3 3; opacity: .8; }
+.chart .ax.refl { fill: var(--ink); font-weight: 700; }
+.chart .cross { stroke: var(--ink); stroke-width: 1; opacity: .35; }
+.lchart .ax { font-size: 10px; } .lchart .ax.wd { font-size: 9px; }
+.chart .elab { fill: var(--ink); font-size: 11px; font-weight: 800; font-family: var(--f-display); }
+.chart-note { margin: 0; }
+.lv-legend.rings i { background: none !important; border: 2.5px solid; border-radius: 50%; width: 11px; height: 11px; }
+.lv-legend.rings i.lv-u2 { border-color: var(--u2); } .lv-legend.rings i.lv-u1 { border-color: var(--u1); }
+.lv-legend.rings i.lv-o1 { border-color: var(--o1); } .lv-legend.rings i.lv-o2 { border-color: var(--o2); }
+.dsel { display: grid; gap: 0; }
+.dsel-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding-bottom: 2px; }
+.dsel-r { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto auto; gap: 8px; align-items: center; font-size: 13.5px; padding: 5px 0; border-top: 1px solid var(--line); }
+.dsel-r .stp { justify-self: end; }
+.avgrow { font-weight: 600; border-top: 1px solid var(--line); }
+.avgrow .mn, .drow .mn { display: grid; justify-items: start; gap: 0; }
 </style>
 </head>
 <body>
@@ -700,26 +751,29 @@ const RX = {
   carbDish: /варени|пельмен|блин|пицц|шаурм|бургер|сэндвич|бутерброд|ролл|лаваш|пирож|манты|хинкал/,
   alco: /пиво|вино|водк|виски|коньяк|сидр|ликер|ликёр|(?<![а-яё])ром(?![а-яё])|джин(?![а-яё])/,
 };
-function itemRecs(meal, it) {
+// совет по продукту: что сделать и что это даст (−жир, +белок, −углеводы, −ккал).
+// cands — каким показателям он помогает, по порядку: совет попадает в карточку первого,
+// который вышел за норму «в плохую сторону» (калории, жиры, углеводы — перебор; белок — недобор)
+function itemRecs(it) {
   const n = it.n.toLowerCase(), out = [];
-  const f = it.f || 0, p = it.p || 0, k = it.k || 0, g = grams(it.portion);
+  const f = it.f || 0, p = it.p || 0, k = it.k || 0, c = it.c || 0, g = grams(it.portion);
   const pe = k ? p * 100 / k : 0, fatShare = k ? f * 9 / k : 0;
-  const w = (title, text, fat, extra = {}) => out.push({ title, text, fat: Math.max(0, Math.round(fat)), item: it, meal: meal.name, ...extra });
-  if (/сэндвич|бутерброд|сендвич/.test(n) && /ветчин|колбас|сыр|бекон/.test(n) && f >= 8) w('Сэндвич — с курицей', `«${it.n}»: ${f1(f)} г жира при ${f1(p)} г белка. Сэндвич или лаваш с запечённой курицей или индейкой и овощами — жира втрое меньше, белка вдвое больше.`, f - 5, { prot: Math.max(0, Math.round(20 - p)) });
-  else if (/яйц|омлет|яичниц/.test(n) && f >= 12) w('Яйца — часть заменить белками', `«${it.n}»: ${f1(f)} г жира. Омлет из 2 яиц + 2–3 белков даёт столько же белка, а жира почти вдвое меньше. И без масла: варёные, пашот или на сухой сковороде.`, f * 0.45);
-  else if (RX.oil.test(n) && f > 6) w('Масло — 1 ч. л.', `«${it.n}»: ${f1(f)} г жира — это около ${Math.max(2, Math.round(f / 5))} ч. л. масла. Отмеряйте 1 ч. л. (5 г).`, f - 5);
-  else if (RX.sweet.test(n) && f >= 3) w('Сладкое к чаю — без жира', `«${it.n}»: ${f1(f)} г жира. Вместо него — зефир, пастила, мармелад, безе или пряник.`, f - 1, { kcal: Math.max(0, k - 110) });
-  else if (RX.cheese.test(n) && f >= 6) w('Сыра — 20–30 г или лёгкий 17%', `«${it.n}»${g ? ` ${f0(g)} г` : ''}: ${f1(f)} г жира. Половина порции или лёгкий сыр — вдвое меньше жира.`, f / 2);
-  else if (RX.nuts.test(n)) { if (g ? g > 25 : f > 12) w('Орехи — не больше 20 г', `«${it.n}»${g ? ` ${f0(g)} г` : ''}: ${f1(f)} г жира. Держите горсть в 20 г.`, g ? f - f * 20 / g : f / 2); } // 20 г орехов — норма, «жареный» в названии не в счёт
-  else if (RX.deli.test(n) && !RX.lean.test(n) && f >= 6) w('Колбасу — на запечённое мясо', `«${it.n}»: ${f1(f)} г жира при ${f1(p)} г белка. Запечённая курица или индейка — тот же белок почти без жира.`, f - 2);
-  else if (RX.fried.test(n) && f >= 8) w('Без жарки на масле', `«${it.n}»: ${f1(f)} г жира. Запеките, на гриле или на сухой сковороде — обычно на 5–10 г жира меньше.`, Math.min(10, f * 0.4));
-  else if (RX.sauce.test(n) && f >= 5) w('Соус полегче', `«${it.n}»: ${f1(f)} г жира. Сметана 10% — 1 ст. л. или йогуртовый соус.`, f * 0.6);
-  else if (RX.carbDish.test(n) && pe < 8 && k > 250) w('Полпорции + белок рядом', `«${it.n}»: ${f0(p)} г белка на ${f0(k)} ккал. Возьмите половину и добавьте курицу или индейку 150 г — белка станет на ~30 г больше.`, f / 2, { prot: 30 });
-  else if (f >= 10 && fatShare > 0.55 && pe < 10 && !/яйц|омлет/.test(n)) w('Много жира при малом белке', `«${it.n}»: ${f1(f)} г жира, белка ${f1(p)} г. Уменьшите порцию или замените на постный белок из памятки.`, f / 2);
+  const w = (act, fat, cands, extra = {}) => { fat = Math.max(0, Math.round(fat)); out.push({ act, fat, kcal: fat * 9, prot: 0, carb: 0, cands, item: it, ...extra }); };
+  if (/сэндвич|бутерброд|сендвич/.test(n) && /ветчин|колбас|сыр|бекон/.test(n) && f >= 8) w('сэндвич или лаваш с курицей или индейкой и овощами', f - 5, ['f', 'p', 'k'], { prot: Math.max(0, Math.round(20 - p)) });
+  else if (/яйц|омлет|яичниц/.test(n) && f >= 12) w('2 яйца + 2–3 белка, без масла', f * 0.45, ['f', 'k']);
+  else if (RX.oil.test(n) && f > 6) w(`масла тут ≈ ${Math.max(2, Math.round(f / 5))} ч. л., отмеряйте 1 ч. л.`, f - 5, ['f', 'k']);
+  else if (RX.sweet.test(n) && f >= 3) w('к чаю — зефир, пастила, мармелад или пряник', f - 1, ['f', 'k'], { kcal: Math.max(0, Math.round(k - 110)) });
+  else if (RX.cheese.test(n) && f >= 6) w('20–30 г или лёгкий сыр 17%', f / 2, ['f', 'k']);
+  else if (RX.nuts.test(n)) { if (g ? g > 25 : f > 12) w('горсть 20 г', g ? f - f * 20 / g : f / 2, ['f', 'k']); } // 20 г орехов — норма
+  else if (RX.deli.test(n) && !RX.lean.test(n) && f >= 6) w('запечённая курица или индейка вместо колбасы', f - 2, ['f', 'k']);
+  else if (RX.fried.test(n) && f >= 8) w('запечь, на гриле или на сухой сковороде', Math.min(10, f * 0.4), ['f', 'k']);
+  else if (RX.sauce.test(n) && f >= 5) w('сметана 10% — 1 ст. л. или йогуртовый соус', f * 0.6, ['f', 'k']);
+  else if (RX.carbDish.test(n) && pe < 8 && k > 250) { const kc = Math.round(k / 2 - 165); w('половина порции + 150 г курицы или индейки', f / 2, kc > 50 ? ['p', 'c', 'k'] : ['p', 'c'], { prot: Math.max(0, Math.round(34 - p / 2)), carb: Math.round(c / 2), kcal: Math.max(0, kc) }); }
+  else if (f >= 10 && fatShare > 0.55 && pe < 10 && !/яйц|омлет/.test(n)) w('порция поменьше или постный белок из памятки', f / 2, ['f', 'k']);
   // ошибка в карточке FatSecret: калории не сходятся с Б/Ж/У
   if (it.p != null && it.f != null && it.c != null && k > 50 && !RX.alco.test(n)) {
-    const calc = p * 4 + f * 9 + (it.c || 0) * 4;
-    if (Math.abs(calc - k) / k > 0.3) out.push({ title: 'Похоже, ошибка в карточке FatSecret', text: `«${it.n}»: указано ${f0(k)} ккал, а по Б/Ж/У выходит ${f0(calc)}. Проверьте продукт — из-за таких ошибок итог дня может быть неверным.`, warn: true, fat: 0, item: it, meal: meal.name });
+    const calc = p * 4 + f * 9 + c * 4;
+    if (Math.abs(calc - k) / k > 0.3) out.push({ warn: true, item: it, k, calc });
   }
   return out;
 }
@@ -752,98 +806,187 @@ const shortPortion = s => String(s || '').replace(/\s*\(.*?\)/g, '').trim();
 const listN = (arr, max = 3) => arr.slice(0, max).map(it => `${it.n.replace(/\s*\.\.\.$/, '…')} (${shortPortion(it.portion) || '—'})`).join(', ');
 
 function analyze(R) {
-  const T = S.targets;
   const meals = MEALS.map(m => { const r = R.meals.find(x => x.name === m.key); const items = r ? r.items : []; return { ...m, items, total: items.length ? (r.total || sumItems(items)) : null }; });
-  const recs = meals.flatMap(m => m.items.flatMap(it => itemRecs(m, it))).sort((a, b) => (b.warn ? -1 : 0) - (a.warn ? -1 : 0) || b.fat - a.fat);
-  const all = meals.flatMap(m => m.items.map(it => ({ ...it, meal: m.n })));
+  // копии продуктов с приёмом — советы и разбор ссылаются на один и тот же объект
+  const all = meals.flatMap(m => m.items.map(it => ({ ...it, meal: m.n, mealKey: m.key })));
+  const recs = [], warns = [];
+  for (const it of all) for (const r of itemRecs(it)) (r.warn ? warns : recs).push(r);
   const t = R.total, empty = meals.filter(m => !m.total);
-  const rest = (empty.length || t.k < T.k - 300) ? restOfDay(t, empty) : null;
-  return { meals, recs, all, t, empty, rest, why: whyCards(t, meals, all, empty) };
+  const rest = empty.length ? restOfDay(t, empty) : null;
+  return { meals, all, t, empty, rest, warns, cards: nutrientCards(t, meals, all, empty, recs) };
 }
 
-// «Почему так»: по каждой метрике — что именно её сдвинуло
-function whyCards(t, meals, all, empty) {
-  const T = S.targets, Rg = ranges(), cards = [];
-  const filled = meals.filter(m => m.total);
-  const note = empty.length ? `Не внесено: ${empty.map(m => m.n.toLowerCase()).join(', ')} — итог неполный.` : '';
-  const sugar = all.reduce((a, it) => a + (it.sug || 0), 0);
+const lc = s => String(s || '').toLowerCase();
+// слово, с которого начинается сам продукт: всё, что до него (до 3 слов), — обычно марка
+const FOOD_WORD = /^(вареник|пельмен|сыр|сгущ|сэндвич|сендвич|бутерброд|сметан|батат|салат|банан|арахис|ветчин|колбас|сосиск|сардельк|творог|творож|кефир|молок|йогурт|скир|ряженк|хлеб|батон|лаваш|тортил|кури|индей|говя|свин|телят|филе|грудк|бедр|окорок|рис|греч|макарон|спагет|паст|картоф|пюре|яйц|яйко|омлет|яичниц|зефир|пастил|мармелад|печень|вафл|конфет|шоколад|торт|пирож|блин|оладь|сырник|каш|овсян|мюсли|хлоп|гранол|сок|морс|компот|чай|кофе|капучино|латте|какао|напит|соус|майонез|кетчуп|горчиц|масл|орех|миндал|кешью|фундук|фисташ|семечк|рыб|лосос|сёмг|семг|форел|горбуш|тунец|тунц|треск|минтай|хек|скумбри|сельд|креветк|кальмар|краб|яблок|груш|апельсин|мандарин|виноград|финик|изюм|кураг|чернослив|ягод|клубник|черник|малин|морков|огур|помидор|томат|капуст|брокколи|перец|лук|чеснок|гриб|шампиньон|суп|борщ|щи|бульон|плов|котлет|тефтел|бризол|фарш|наггетс|бургер|шаурм|шаверм|пицц|ролл|суши|мёд|мед|варень|джем|пряник|безе|протеин|батончик|мороже|пудинг|десерт|круассан|пончик|булк|булоч|сухар|крекер|чипс|попкорн|кукуруз|фасол|горох|нут|чечевиц|тофу|бекон|сало|паштет|печён|печен|хинкал|манты|чебурек|беляш|самса|пирог|кекс|маффин|эклер|халв|сушк|баранк|авокадо|оливк|маслин|киви|ананас|арбуз|дын|персик|абрикос|слив|вишн|черешн|грейпфрут|лимон|хумус|творожок|глазир)/;
+// короткое имя продукта: без марки, пояснений в скобках и хвоста «...»
+const nmH = s => {
+  s = String(s || '').replace(/\s*\(.*?\)\s*/g, ' ').replace(/\s*\.\.\.$/, '…').replace(/\s+/g, ' ').trim();
+  const w = s.split(' '), i = w.findIndex(x => FOOD_WORD.test(x.toLowerCase()));
+  if (i > 0 && i <= 3) { s = w.slice(i).join(' '); s = s[0].toUpperCase() + s.slice(1); }
+  return esc(s.length > 36 ? s.slice(0, 34).trim() + '…' : s);
+};
+const sumBy = (arr, k) => arr.reduce((a, x) => a + (x[k] || 0), 0);
+const itemH = it => `<b>${nmH(it.n)}</b> <small>${esc(lc(it.meal))}</small>`;
+const joinRu = a => a.length > 1 ? a.slice(0, -1).join(', ') + ' и ' + a[a.length - 1] : a[0] || '';
 
-  // калории
-  {
-    const L = lvlK(t.k, Rg.k), lines = [];
-    if (note) lines.push(note);
-    const heavy = filled.map(m => ({ m, share: m.total.k / (t.k || 1), want: MEAL_SHARE[m.key] })).sort((a, b) => b.m.total.k - a.m.total.k);
-    for (const x of heavy) if (x.share > x.want + 0.08 && x.m.total.k > T.k * x.want * 1.25) lines.push(`${x.m.n}: ${f0(x.m.total.k)} ккал — ${pct(x.share)} дня, ориентир около ${pct(x.want)}.`);
-    const fatShare = t.k ? t.f * 9 / t.k : 0;
-    if (fatShare > 0.35) lines.push(`Жиры дали ${pct(fatShare)} калорий при ориентире ~30% — большая часть «лишних» калорий пришла с жиром.`);
-    if (sugar > 50) lines.push(`Сахара ≈ ${f0(sugar)} г — это ~${f0(sugar * 4)} ккал «быстрых» калорий.`);
-    const top = [...all].filter(it => it.k).sort((a, b) => b.k - a.k);
-    if (top.length) lines.push(`Самое калорийное: ${top.slice(0, 3).map(it => `${it.n.replace(/\s*\.\.\.$/, '…')} — ${f0(it.k)}`).join('; ')} ккал.`);
-    if (L.cls === 'ok') lines.unshift('Калории в цели.');
-    if (L.cls === 'o1' || L.cls === 'o2') lines.unshift(`На ${f0(t.k - T.k)} ккал больше цели — дефицит меньше задуманного, снижение замедлится.`);
-    if (L.cls === 'u1' || L.cls === 'u2') lines.unshift(empty.length ? 'Калорий пока меньше цели — день ещё не закончен.' : `До цели не хватило ${f0(Rg.k[0] - t.k)} ккал: при сильном дефиците тяжелее сохранить мышцы.`);
-    cards.push({ key: 'k', title: 'Калории', val: `${f0(t.k)} из ${f0(T.k)}`, unit: 'ккал', L, lines });
-  }
+// по каждому показателю: «Почему так» — только причины, «Что исправить» — действия с эффектом
+function nutrientCards(t, meals, all, empty, recs) {
+  const T = S.targets, Rg = ranges(), filled = meals.filter(m => m.total);
+  const Ls = { k: lvlK(t.k, Rg.k), p: lvl(t.p, T.p[0], T.p[1]), f: lvl(t.f, T.f[0], T.f[1], T.fMin), c: lvl(t.c, T.c[0], T.c[1]) };
+  const over = x => Ls[x].cls === 'o1' || Ls[x].cls === 'o2', under = x => Ls[x].cls === 'u1' || Ls[x].cls === 'u2';
+  const bad = { k: over('k'), p: under('p'), f: over('f'), c: over('c') };
+  const partial = empty.length > 0, emptyTxt = empty.map(m => m.n.toLowerCase()).join(', ');
+  // каждый совет — в одну карточку, продукт — в один совет
+  const fix = { k: [], p: [], f: [], c: [] }, used = new Set();
+  for (const r of recs) { const to = r.cands.find(x => bad[x]); if (to) { fix[to].push(r); used.add(r.item); } }
+  const G = { k: r => `−${f0(r.kcal)} ккал`, p: r => `+${f0(r.prot)} г белка`, f: r => `−${f0(r.fat)} г жира`, c: r => `−${f0(r.carb)} г углеводов` };
+  const S0 = { k: 'kcal', p: 'prot', f: 'fat', c: 'carb' };
+  for (const key in fix) fix[key].sort((a, b) => b[S0[key]] - a[S0[key]]);
+  const recLine = (key, r) => ({ html: `${itemH(r.item)} — ${esc(r.act)}`, gain: G[key](r), r });
+  const shown = { k: [], p: [], f: [], c: [] }; // советы, которые реально показаны: по ним — перекрёстные итоги
+  const card = {};
+  const isSweet = it => SWEET_FRUIT.test(lc(it.n));
+  const NAMES = { p: 'белку', f: 'жирам', c: 'углеводам', k: 'калориям' };
+
   // белок
   {
-    const L = lvl(t.p, T.p[0], T.p[1]), lines = [];
-    const lowMeals = filled.filter(m => m.total.p < m.p[0]);
-    const dense = all.filter(it => it.k && it.p && it.p * 100 / it.k >= 15).sort((a, b) => b.p - a.p);
-    const empt = all.filter(it => (it.k || 0) >= 100 && (it.p || 0) * 100 / it.k < 4 && !GARNISH.test(it.n.toLowerCase())).sort((a, b) => b.k - a.k);
-    if (L.cls === 'u1' || L.cls === 'u2') {
-      lines.push(`Не хватило ${f0(T.p[0] - t.p)} г белка.`);
-      if (lowMeals.length) lines.push(`Мало белка в приёмах: ${lowMeals.map(m => `${m.n.toLowerCase()} ${f0(m.total.p)} г (нужно ${m.p[0]}–${m.p[1]})`).join(', ')}.`);
-      if (dense.length) lines.push(`«Чистый» белок за день: ${dense.slice(0, 4).map(it => it.n.replace(/\s*\.\.\.$/, '…')).join(', ')} — всего ${f0(dense.reduce((a, it) => a + it.p, 0))} г.`);
-      else lines.push('За день не было ни одного «чистого» белкового продукта — курицы, индейки, рыбы, творога, скира.');
-      if (empt.length) {
-        const k = empt.reduce((a, it) => a + it.k, 0), p = empt.reduce((a, it) => a + (it.p || 0), 0);
-        lines.push(`Калории почти без белка: ${empt.slice(0, 4).map(it => it.n.replace(/\s*\.\.\.$/, '…')).join(', ')} — ${f0(k)} ккал, белка ${f0(p)} г. Те же калории в курице — это ~${f0(k * 23 / 110)} г белка.`);
-      }
-    } else if (L.cls === 'ok') {
-      lines.push('Белок в норме.');
-      if (dense.length) lines.push(`Больше всего дали: ${dense.slice(0, 3).map(it => it.n.replace(/\s*\.\.\.$/, '…')).join(', ')}.`);
-    } else lines.push('Белка больше нормы — это не страшно, если укладываетесь в калории.');
-    cards.push({ key: 'p', title: 'Белок', val: `${f0(t.p)} из ${T.p[0]}–${T.p[1]}`, unit: 'г', L, lines });
+    const why = [], fx = [];
+    if (under('p')) {
+      const lowMeals = filled.filter(m => m.total.p < m.p[0]).sort((a, b) => (b.p[0] - b.total.p) - (a.p[0] - a.total.p));
+      if (lowMeals.length) why.push(`Мало белка в ${lowMeals.length > 1 ? 'приёмах' : 'приёме'}: ${lowMeals.map(m => `${m.n.toLowerCase()} — ${f0(m.total.p)} г из ${m.p[0]}–${m.p[1]}`).join(', ')}.`);
+      const dense = all.filter(it => it.k && it.p && it.p * 100 / it.k >= 15).sort((a, b) => b.p - a.p);
+      const dP = sumBy(dense, 'p');
+      if (!dense.length) why.push('За день не было постного белка — мяса, птицы, рыбы, творога.');
+      else if (dP < T.p[0] * 0.6) why.push(`Постный белок (мясо, рыба, творог) дал только ${f0(dP)} г из ${f0(t.p)}: ${dense.slice(0, 3).map(it => nmH(it.n)).join(', ')}.`);
+      const empt = all.filter(it => (it.k || 0) >= 100 && (it.p || 0) * 100 / it.k < 4 && !GARNISH.test(lc(it.n))).sort((a, b) => b.k - a.k);
+      if (empt.length && sumBy(empt, 'k') >= 250) why.push(`Калории почти без белка: ${empt.slice(0, 3).map(it => nmH(it.n)).join(', ')} — ${f0(sumBy(empt, 'k'))} ккал, белка ${f0(sumBy(empt, 'p'))} г.`);
+      // чем добрать: в недобравший приём — сначала совет по его блюду (полпорции + курица), иначе постный белок из памятки
+      const list = proteins();
+      const mains = list.filter(x => (x.kind === 'meat' || x.kind === 'fish') && x.f <= 3 && x.p >= 15);
+      const dairy = list.filter(x => x.kind === 'dairy' && x.f <= 2 && x.p >= 9);
+      const max = partial ? 2 : 3, recsP = [...fix.p];
+      let need = T.p[0] - t.p, mi = 0;
+      const r10 = v => Math.round(v / 10) * 10;
+      const addTo = (m, gap) => {
+        const ri = recsP.findIndex(r => r.item.mealKey === m.key);
+        if (ri >= 0) { const r = recsP.splice(ri, 1)[0]; need -= r.prot; shown.p.push(r); fx.push(recLine('p', r)); return; }
+        const light = m.key === 'Завтрак' || m.key === 'Перекус/Другое';
+        const x = (light ? dairy[0] : mains[mi++ % Math.max(1, mains.length)]) || mains[0] || dairy[0];
+        if (!x) return;
+        const g = Math.min(light ? 300 : 250, Math.max(light ? 150 : 100, r10(gap * 100 / x.p)));
+        const gp = g * x.p / 100; need -= gp;
+        const raw = (x.kind === 'meat' || x.kind === 'fish') && x.note ? ` (${esc(x.note)})` : '';
+        fx.push({ html: `<b>${esc(m.n)}</b>: ${esc(x.n.toLowerCase())} ${f0(g)} г${raw}`, gain: `+${f0(gp)} г белка`, addK: g * x.k / 100 });
+      };
+      for (const m of lowMeals) { if (need < 5 || fx.length >= max) break; addTo(m, Math.min(need, m.p[0] - m.total.p + 5)); }
+      for (const r of recsP) if (fx.length < max && need >= 5) { need -= r.prot; shown.p.push(r); fx.push(recLine('p', r)); }
+      if (need >= 10 && fx.length < max && !partial) { const m = filled.find(m => m.key === 'Перекус/Другое') || filled[filled.length - 1]; if (m) addTo(m, need); }
+      if (partial) fx.push({ html: 'Для невнесённых приёмов — блок «Что съесть» ниже.' });
+    } else if (over('p')) why.push('Белка больше нормы — это не страшно, если калории в цели.');
+    card.p = { why, fix: fx };
   }
   // жиры
   {
-    const L = lvl(t.f, T.f[0], T.f[1], T.fMin), lines = [];
-    const groups = {};
-    for (const it of all) if (it.f) groups[fatGroup(it.n.toLowerCase())] = (groups[fatGroup(it.n.toLowerCase())] || 0) + it.f;
-    const gs = Object.entries(groups).sort((a, b) => b[1] - a[1]);
-    const top = all.filter(it => (it.f || 0) >= 3).sort((a, b) => b.f - a.f);
-    if (L.cls === 'o1' || L.cls === 'o2') {
-      lines.push(`Лишние ${f0(t.f - T.f[1])} г жира — это ~${f0((t.f - T.f[1]) * 9)} ккал.`);
-      lines.push(`По источникам: ${gs.slice(0, 4).map(([g, v]) => `${g.toLowerCase()} ${f0(v)} г (${pct(v / t.f)})`).join(', ')}.`);
-      if (top.length) lines.push(`Больше всего жира: ${top.slice(0, 3).map(it => `${it.n.replace(/\s*\.\.\.$/, '…')} — ${f1(it.f)} г`).join('; ')}.`);
-      const avoid = (groups['Масло, заправки, соусы'] || 0) + (groups['Сладкое'] || 0) + (groups['Жареное'] || 0);
-      if (avoid >= 10) lines.push(`Масло, соусы, сладкое и жарка вместе дали ${f0(avoid)} г — это самый простой резерв, без потери белка.`);
-    } else if (L.cls === 'ok') {
-      lines.push('Жиры в норме.');
-      if (gs.length) lines.push(`Основные источники: ${gs.slice(0, 3).map(([g, v]) => `${g.toLowerCase()} ${f0(v)} г`).join(', ')}.`);
-    } else lines.push(`Жиров мало: не опускайтесь ниже ${T.fMin} г — это нужно для гормонов. Подойдут рыба, яйца, 20 г орехов.`);
-    cards.push({ key: 'f', title: 'Жиры', val: `${f0(t.f)} из ${T.f[0]}–${T.f[1]}`, unit: 'г', L, lines });
+    const why = [], fx = [];
+    let note = '';
+    if (over('f')) {
+      const groups = {};
+      for (const it of all) if (it.f) { const g = fatGroup(lc(it.n)); (groups[g] = groups[g] || { v: 0, items: [] }); groups[g].v += it.f; groups[g].items.push(it); }
+      for (const [g, x] of Object.entries(groups).sort((a, b) => b[1].v - a[1].v).slice(0, 3))
+        why.push(`${esc(g)} — ${f0(x.v)} г: ${x.items.sort((a, b) => b.f - a.f).slice(0, 2).map(it => nmH(it.n)).join(', ')}.`);
+      for (const r of fix.f.slice(0, 3)) { shown.f.push(r); fx.push(recLine('f', r)); }
+      if (!fx.length) for (const it of all.filter(it => !used.has(it) && (it.f || 0) >= 8).sort((a, b) => b.f - a.f).slice(0, 2)) { used.add(it); fx.push({ html: `${itemH(it)} — порция поменьше`, gain: `−${f0(it.f / 2)} г жира` }); }
+      const save = sumBy(shown.f, 'fat');
+      if (save >= 5) note = `Если поправить это: жиров ≈ ${f0(Math.max(0, t.f - save))} г вместо ${f0(t.f)}.`;
+    } else if (under('f')) {
+      if (partial) why.push(`Не внесено: ${emptyTxt} — день не закончен.`);
+      else {
+        why.push(t.f < T.fMin ? `Жиров меньше минимума ${T.fMin} г — они нужны для гормонов.` : 'Жиров немного меньше нормы.');
+        fx.push({ html: 'Рыба (горбуша 150 г), 1–2 яйца или 20 г орехов', gain: '+10 г жира' });
+      }
+    }
+    card.f = { why, fix: fx, note };
+  }
+  // калории
+  const halfs = [];
+  {
+    const why = [], fx = [];
+    if (over('k')) {
+      const heavy = filled.map(m => ({ m, share: m.total.k / (t.k || 1), want: MEAL_SHARE[m.key] }))
+        .filter(x => x.share > x.want + 0.08 && x.m.total.k > T.k * x.want * 1.25).sort((a, b) => b.m.total.k - a.m.total.k);
+      for (const x of heavy.slice(0, 2)) why.push(`${esc(x.m.n)} — ${f0(x.m.total.k)} ккал, это ${pct(x.share)} дня при ориентире ${pct(x.want)}.`);
+      const fatShare = t.k ? t.f * 9 / t.k : 0;
+      if (fatShare > 0.35) why.push(`${pct(fatShare)} калорий дал жир — ориентир около 30%.`);
+      const sw = all.filter(it => isSweet(it) && it.k).sort((a, b) => b.k - a.k);
+      if (sumBy(sw, 'k') >= 200) why.push(`Сладкое и фрукты — ${f0(sumBy(sw, 'k'))} ккал: ${sw.slice(0, 3).map(it => `${nmH(it.n)} ${f0(it.k)}`).join(', ')}.`);
+      if (!why.length) why.push(`Самое калорийное: ${[...all].filter(it => it.k).sort((a, b) => b.k - a.k).slice(0, 3).map(it => `${nmH(it.n)} ${f0(it.k)}`).join(', ')} ккал.`);
+      // советы из других карточек тоже снимают калории
+      const otherR = [...shown.p, ...shown.f, ...fix.c.slice(0, 2)];
+      const other = sumBy(otherR, 'kcal') - sumBy(card.p.fix, 'addK'), excess = t.k - T.k; // добавки белка калории прибавляют
+      const from = ['p', 'f', 'c'].filter(k => otherR.some(r => fix[k].includes(r) && r.kcal > 0)).map(k => NAMES[k]);
+      const max = other >= 60 ? 2 : 3;
+      for (const r of fix.k.slice(0, max - 1)) { shown.k.push(r); fx.push(recLine('k', r)); }
+      let left = excess - sumBy(shown.k, 'kcal') - other;
+      // половина порции: сначала сладкое и «углеводные» блюда, постный белок не трогаем
+      const prio = it => (isSweet(it) || RX.carbDish.test(lc(it.n)) || RX.alco.test(lc(it.n))) ? 0 : 1;
+      const cand = all.filter(it => !used.has(it) && (it.k || 0) >= 150 && !(it.p && it.p * 100 / it.k >= 12)).sort((a, b) => prio(a) - prio(b) || b.k - a.k);
+      for (const it of cand) {
+        if (left <= 60 || fx.length >= max) break;
+        used.add(it); halfs.push(it); left -= it.k / 2;
+        fx.push({ html: `${itemH(it)} — половина порции`, gain: `−${f0(it.k / 2)} ккал` });
+      }
+      if (other >= 60) fx.push({ html: `Советы по ${joinRu(from)} ниже${other >= excess ? ' — этого хватит, чтобы уложиться в цель' : ''}`, gain: `−${f0(other)} ккал` });
+    } else if (under('k')) {
+      if (partial) { why.push(`Не внесено: ${emptyTxt} — итог неполный.`); fx.push({ html: 'Что съесть — в блоке ниже.' }); }
+      else {
+        why.push('При слишком большом дефиците тяжелее сохранить мышцы и выдержать режим.');
+        const light = filled.map(m => ({ m, share: m.total.k / (t.k || 1), want: MEAL_SHARE[m.key] })).filter(x => x.share < x.want - 0.08).sort((a, b) => a.share - b.share);
+        for (const x of light.slice(0, 2)) why.push(`${esc(x.m.n)} — ${f0(x.m.total.k)} ккал, это ${pct(x.share)} дня при ориентире ${pct(x.want)}.`);
+        if (under('p') || under('c')) fx.push({ html: `Добирайте ${joinRu([under('p') && 'белком', under('c') && 'гарниром'].filter(Boolean))} — советы в карточках ниже.` });
+        else { const g = Math.min(100, Math.max(30, Math.round((T.k - t.k) / 3.4 / 5) * 5)); fx.push({ html: `Гарнир к обеду или ужину: гречка, рис или макароны ${g} г сухого веса`, gain: `+${f0(g * 3.4)} ккал` }); }
+      }
+    }
+    card.k = { why, fix: fx };
   }
   // углеводы
   {
-    const L = lvl(t.c, T.c[0], T.c[1]), lines = [];
-    const top = all.filter(it => (it.c || 0) >= 10).sort((a, b) => b.c - a.c);
-    const sf = all.filter(it => SWEET_FRUIT.test(it.n.toLowerCase()));
-    const sfC = sf.reduce((a, it) => a + (it.c || 0), 0);
-    if (L.cls === 'o1' || L.cls === 'o2') {
-      lines.push(`Лишние ${f0(t.c - T.c[1])} г углеводов — ~${f0((t.c - T.c[1]) * 4)} ккал.`);
-      if (top.length) lines.push(`Больше всего углеводов: ${top.slice(0, 3).map(it => `${it.n.replace(/\s*\.\.\.$/, '…')} — ${f0(it.c)} г`).join('; ')}.`);
-      if (sfC >= 30) lines.push(`Сладкое и фрукты: ${f0(sfC)} г углеводов (${listN(sf.sort((a, b) => b.c - a.c), 3)}).`);
-      const big = all.filter(it => (it.c || 0) >= 60 && !SWEET_FRUIT.test(it.n.toLowerCase()));
-      if (big.length) lines.push(`Большие порции: ${big.map(it => `${it.n.replace(/\s*\.\.\.$/, '…')} ${shortPortion(it.portion)} — ${f0(it.c)} г`).join('; ')}. Половина порции + белок рядом.`);
-    } else if (L.cls === 'ok') {
-      lines.push('Углеводы в норме.');
-      if (sfC >= 50) lines.push(`Из них сладкое и фрукты — ${f0(sfC)} г; лучше, чтобы основу давали крупы и хлеб.`);
-    } else lines.push(empty.length ? 'Углеводов пока мало — день не закончен.' : `Не хватило ${f0(T.c[0] - t.c)} г углеводов — добавьте гарнир: ~${f0((T.c[0] - t.c) / 0.7)} г крупы в сухом виде.`);
-    if (sugar > 0 && !lines.some(l => /Сахара/.test(l))) lines.push(`Сахара за день: ${f0(sugar)} г.`);
-    cards.push({ key: 'c', title: 'Углеводы', val: `${f0(t.c)} из ${T.c[0]}–${T.c[1]}`, unit: 'г', L, lines });
+    const why = [], fx = [];
+    if (over('c')) {
+      const sf = all.filter(it => isSweet(it) && it.c).sort((a, b) => b.c - a.c);
+      if (sumBy(sf, 'c') >= 30) why.push(`Сладкое и фрукты — ${f0(sumBy(sf, 'c'))} г: ${sf.slice(0, 3).map(it => `${nmH(it.n)} ${f0(it.c)} г`).join(', ')}.`);
+      const big = all.filter(it => (it.c || 0) >= 60 && !isSweet(it)).sort((a, b) => b.c - a.c);
+      if (big.length) why.push(`Большие порции: ${big.slice(0, 2).map(it => `${nmH(it.n)}${it.portion ? ' ' + esc(shortPortion(it.portion)) : ''} — ${f0(it.c)} г`).join(', ')}.`);
+      if (!why.length) why.push(`Больше всего углеводов: ${all.filter(it => it.c).sort((a, b) => b.c - a.c).slice(0, 3).map(it => `${nmH(it.n)} ${f0(it.c)} г`).join(', ')}.`);
+      // половины порций из «Калорий» и советы по белку тоже снимают углеводы
+      const otherC = sumBy(halfs, 'c') / 2 + sumBy([...shown.p, ...shown.k], 'carb');
+      const from = [(halfs.length || shown.k.some(r => r.carb)) && 'калориям', shown.p.some(r => r.carb) && 'белку'].filter(Boolean);
+      const max = otherC >= 10 ? 2 : 3;
+      for (const r of fix.c.slice(0, max)) { shown.c.push(r); fx.push(recLine('c', r)); }
+      let left = t.c - T.c[1] - sumBy(shown.c, 'carb') - otherC;
+      const cand = all.filter(it => !used.has(it) && (it.c || 0) >= 20 && (isSweet(it) || it.c >= 60)).sort((a, b) => b.c - a.c);
+      for (const it of cand) {
+        if (left <= 10 || fx.length >= max) break;
+        used.add(it); left -= it.c / 2;
+        fx.push({ html: `${itemH(it)} — половина порции${isSweet(it) ? '' : ', рядом белок'}`, gain: `−${f0(it.c / 2)} г углеводов` });
+      }
+      if (otherC >= 10) fx.push({ html: `Советы по ${joinRu(from.length ? from : ['калориям'])} выше`, gain: `−${f0(otherC)} г углеводов` });
+    } else if (under('c')) {
+      if (partial) why.push(`Не внесено: ${emptyTxt} — день не закончен.`);
+      else {
+        const gar = all.filter(it => GARNISH.test(lc(it.n)));
+        why.push(gar.length ? `Гарниров и хлеба — ${f0(sumBy(gar, 'c'))} г углеводов: ${gar.slice(0, 3).map(it => nmH(it.n)).join(', ')}.` : 'За день почти не было гарниров и хлеба.');
+        const g = Math.min(120, Math.max(30, Math.round((T.c[0] - t.c) / 0.7 / 5) * 5));
+        fx.push({ html: `Гарнир к обеду или ужину: гречка, рис или макароны ${g} г сухого веса`, gain: `+${f0(g * 0.7)} г углеводов` });
+      }
+    }
+    card.c = { why, fix: fx };
   }
-  return cards;
+  const head = {
+    k: ['Калории', `${f0(t.k)} из ${f0(T.k)}`, 'ккал'], p: ['Белок', `${f0(t.p)} из ${T.p[0]}–${T.p[1]}`, 'г'],
+    f: ['Жиры', `${f0(t.f)} из ${T.f[0]}–${T.f[1]}`, 'г'], c: ['Углеводы', `${f0(t.c)} из ${T.c[0]}–${T.c[1]}`, 'г'],
+  };
+  return ['k', 'p', 'f', 'c'].map(key => ({ key, title: head[key][0], val: head[key][1], unit: head[key][2], L: Ls[key], why: card[key].why.slice(0, 3), fix: card[key].fix.slice(0, 3), note: card[key].note || '' }));
 }
 // «до конца дня»: добрать белок постным продуктом из памятки, остаток калорий — гарниром
 function restOfDay(t, empty) {
@@ -934,6 +1077,7 @@ function renderReport() {
   const kL = lvlK(t.k, Rg.k);
   const left = T.k - t.k, scaleMax = Math.max(T.k * 1.15, t.k);
   const leftTxt = kL.cls === 'ok' ? 'в цели' : left > 0 ? 'ещё ' + f0(left) : 'перебор ' + f0(-left);
+  // 1. общая сводка
   h += `<div class="sum">
       <div class="sum-head"><span class="eyebrow">${esc(R.date || 'Отчёт')}</span>${A.empty.length ? `<span class="tagw">не внесено: ${A.empty.map(m => m.n.toLowerCase()).join(', ')}</span>` : ''}</div>
       <div class="kline"><span class="big num">${f0(t.k)}</span><span class="of num">/ ${f0(T.k)} ккал</span><span class="stp big-st lv-${kL.cls} num">${leftTxt}</span></div>
@@ -941,40 +1085,41 @@ function renderReport() {
       <div class="macros">${macroBlock('p', 'Б', t.p, T.p)}${macroBlock('f', 'Ж', t.f, T.f, T.fMin)}${macroBlock('c', 'У', t.c, T.c)}</div>
       ${LEGEND}
     </div>`;
-  // почему так
-  h += `<div class="sec-h">Почему так</div><div class="whys">${A.why.map(c => `<div class="whyc lv-${c.L.cls}">
-      <div class="why-h"><b>${c.title}</b><span class="num">${c.val} ${c.unit}</span><span class="stp lv-${c.L.cls} num">${lvlText(c.L, c.unit)}</span></div>
-      <ul>${c.lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul></div>`).join('')}</div>`;
-  // по приёмам
+  // 2. по приёмам
   h += `<div class="sec-h">По приёмам</div><div class="card mtable">
     <div class="mrow mhead num"><span></span><span>ккал</span><span>Б</span><span>Ж</span><span>У</span></div>`;
   for (const m of A.meals) {
     if (!m.total) { h += `<div class="mrow num empty"><span class="mn">${m.n}</span><span class="mempty">не внесено</span></div>`; continue; }
     const rg = ranges(m.key), cell = (v, r, d = 0) => { const L = lvl(v, r[0], r[1]); return `<span class="cell lv-${L.cls}" title="норма ${r[0]}–${r[1]}">${d ? f1(v) : f0(v)}</span>`; };
-    const pL = lvl(m.total.p, m.p[0], m.p[1]);
     h += `<details class="mdet"><summary class="mrow num"><span class="mn">${m.n}${IC.chev}</span>${cell(m.total.k, rg.k)}${cell(m.total.p, rg.p)}${cell(m.total.f, rg.f)}${cell(m.total.c, rg.c)}</summary>
-      <p class="mnote num">Норма приёма: ${rg.k[0]}–${rg.k[1]} ккал · Б ${rg.p[0]}–${rg.p[1]} · Ж ${rg.f[0]}–${rg.f[1]} · У ${rg.c[0]}–${rg.c[1]}${pL.cls.startsWith('u') ? `. Белка мало — добавьте: ${m.tip}.` : ''}</p>
+      <p class="mnote num">Норма приёма: ${rg.k[0]}–${rg.k[1]} ккал · Б ${rg.p[0]}–${rg.p[1]} · Ж ${rg.f[0]}–${rg.f[1]} · У ${rg.c[0]}–${rg.c[1]}</p>
       <div class="mitems">${m.items.map(it => `<div class="mi num"><span class="mi-n">${esc(it.n)}<small>${esc(it.portion || '')}</small></span><span>${it.k != null ? f0(it.k) : '—'}</span><span>${it.p != null ? f1(it.p) : '—'}</span><span>${it.f != null ? f1(it.f) : '—'}</span><span>${it.c != null ? f1(it.c) : '—'}</span></div>`).join('')}</div>
     </details>`;
   }
-  h += `</div><p class="rule-hint page-foot">Нормы приёма — доля дневной нормы: завтрак 25%, обед и ужин по 30%, перекус 15%. Нажмите на приём — покажу продукты.</p>`;
-  // что поправить
-  if (A.recs.length) {
-    h += `<div class="sec-h">Что поправить</div><div class="recs">${A.recs.map(r => `<div class="rec ${r.warn ? 'warn' : ''}"><div class="rec-h"><b>${esc(r.title)}</b>${r.fat ? `<span class="pill num">−${f0(r.fat)} г жира</span>` : ''}${r.prot ? `<span class="pill num ok">+${f0(r.prot)} г белка</span>` : ''}</div><p>${esc(r.text)}</p><small>${esc(MEALS.find(m => m.key === r.meal)?.n || '')}</small></div>`).join('')}</div>`;
-    const sumFat = A.recs.reduce((a, r) => a + (r.fat || 0), 0), sumP = A.recs.reduce((a, r) => a + (r.prot || 0), 0);
-    if (sumFat >= 5) h += `<p class="rule-hint recs-sum num">Если поправить всё: жиров ≈ ${f0(Math.max(0, t.f - sumFat))} г вместо ${f0(t.f)}${sumP ? `, белка ≈ ${f0(t.p + sumP)} г` : ''}.</p>`;
-  } else if (A.meals.some(m => m.total)) {
-    h += `<div class="sec-h">Что поправить</div><div class="card"><p class="okline">Явных «жирных» привычек в отчёте не нашлось.</p></div>`;
-  }
-  // до конца дня
+  h += `</div><p class="rule-hint page-foot">Цвет — против нормы приёма: это доля дня (завтрак 25%, обед и ужин по 30%, перекус 15%). Нажмите на приём — покажу продукты.</p>`;
+  // 3. по каждому показателю: почему так → что исправить
+  h += `<div class="sec-h">Почему так и что исправить</div><div class="whys">${A.cards.map(cardHTML).join('')}</div>`;
+  // ошибки в карточках FatSecret — отдельно и коротко
+  if (A.warns.length) h += `<div class="sec-h">Проверьте в FatSecret</div><div class="card warns"><ul>${A.warns.map(w => `<li><b>${nmH(w.item.n)}</b>: указано ${f0(w.k)} ккал, а по Б/Ж/У выходит ${f0(w.calc)}.</li>`).join('')}</ul><p class="rule-hint">Похоже на ошибку в карточке продукта — итог дня из-за неё может быть неверным.</p></div>`;
+  // что съесть — только если приём не внесён
   if (A.rest) {
     const after = A.rest.after;
-    h += `<div class="sec-h">${A.rest.empty.length ? 'Что съесть: ' + A.rest.empty.join(', ').toLowerCase() : 'Что добрать до конца дня'}</div>
+    h += `<div class="sec-h">Что съесть: ${A.rest.empty.join(', ').toLowerCase()}</div>
       <div class="card rest"><ul>${A.rest.parts.map(x => `<li><b>${esc(x.n)} ${f0(x.g)} г</b>${x.note ? ` <small>${esc(x.note)}</small>` : ''}<span class="num">${f0(x.k)} ккал · Б ${f0(x.p)} · Ж ${f1(x.f)}</span></li>`).join('')}</ul>
       <p class="rest-sum num">Получится за день: <b>${f0(after.k)} ккал</b> · Б ${f0(after.p)} · Ж ${f0(after.f)} · У ${f0(after.c)}</p>
       <p class="rule-hint">Белок — из первых постных продуктов вашей памятки «Белок». Без масла: жиров на сегодня осталось ${f0(Math.max(0, T.f[1] - t.f))} г.</p></div>`;
   }
   return h;
+}
+// карточка показателя: в норме — одна строка, иначе «Почему так» и «Что исправить»
+function cardHTML(c) {
+  const calm = !c.why.length && !c.fix.length;
+  return `<div class="whyc lv-${c.L.cls}${calm ? ' calm' : ''}">
+    <div class="why-h"><i class="sw m-${c.key}"></i><b>${c.title}</b><span class="num">${c.val} ${c.unit}</span><span class="stp lv-${c.L.cls} num">${lvlText(c.L, c.unit)}</span></div>
+    ${c.why.length ? `<div class="wsec"><h3>Почему так</h3><ul>${c.why.map(l => `<li>${l.replace(/…\.$/, '…')}</li>`).join('')}</ul></div>` : ''}
+    ${c.fix.length ? `<div class="wsec fix"><h3>Что исправить</h3><ul>${c.fix.map(x => `<li>${x.html}${x.gain ? ` <span class="gain num">${x.gain}</span>` : ''}</li>`).join('')}</ul></div>` : ''}
+    ${c.note ? `<p class="wnote num">${c.note}</p>` : ''}
+  </div>`;
 }
 function shortDate(r) {
   if (!r.key) return r.date || 'отчёт';
@@ -983,8 +1128,9 @@ function shortDate(r) {
 }
 
 /* ---------- динамика: дни и недели, весь день или один приём ---------- */
-const DYN_METRICS = [['k', 'Калории', 'ккал'], ['p', 'Белок', 'г'], ['f', 'Жиры', 'г'], ['c', 'Углеводы', 'г']];
-let dyn = { period: 7, scope: '', metric: 'k', sel: null };
+// показатели графика: ключ, имя, единица, подпись у конца линии (КБЖУ)
+const MET = [['k', 'Калории', 'ккал', 'К'], ['p', 'Белок', 'г', 'Б'], ['f', 'Жиры', 'г', 'Ж'], ['c', 'Углеводы', 'г', 'У']];
+let dyn = { period: 7, scope: '', hide: [], sel: null };
 const keyDate = k => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); };
 const dayDiff = (a, b) => Math.round((keyDate(a) - keyDate(b)) / 864e5);
 function mondayKey(k) { const d = keyDate(k), wd = (d.getDay() + 6) % 7; d.setDate(d.getDate() - wd); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
@@ -994,85 +1140,139 @@ function dayVals(r, scope) {
   const m = r.meals.find(x => x.name === scope);
   return m && m.items.length ? (m.total || sumItems(m.items)) : null;
 }
+// уровень показателя против нормы (калории — от цели, жиры дня — с минимумом)
+function metLvl(mk, v, Rg, scope) {
+  if (v == null) return lvl(null);
+  if (mk === 'k') return lvlK(v, Rg.k);
+  return lvl(v, Rg[mk][0], Rg[mk][1], mk === 'f' && !scope ? Rg.fMin : null);
+}
+const MAIN_MEALS = ['Завтрак', 'Обед', 'Ужин'];
+const missing = r => MAIN_MEALS.filter(k => { const m = r.meals.find(x => x.name === k); return !(m && m.items.length); });
+const partialDay = r => !dyn.scope && missing(r).length > 0;
+const midOf = (Rg, mk) => (Rg[mk][0] + Rg[mk][1]) / 2;
+function toggleMetric(mk) {
+  const h = new Set(dyn.hide);
+  if (h.has(mk)) h.delete(mk); else if (MET.length - h.size > 1) h.add(mk); // последнюю линию не прячем
+  dyn.hide = [...h];
+}
+const RING_LEGEND = `<div class="lv-legend rings"><span><i class="lv-u2"></i>сильный недобор</span><span><i class="lv-u1"></i>недобор</span><span><i class="lv-o1"></i>перебор</span><span><i class="lv-o2"></i>сильный перебор</span></div>`;
 function renderDynamics() {
   const all = [...S.reports].filter(r => r.key).sort((a, b) => a.key.localeCompare(b.key));
   let h = `<h1 class="page-h">Динамика</h1>`;
   if (all.length < 2) return h + `<div class="card empty-state"><b>Нужно хотя бы два дня</b><p>Загрузите во вкладке «Разбор» отчёты за несколько дней — по ссылкам на дни или одним недельным отчётом FatSecret.</p></div>`;
   const last = all[all.length - 1].key;
   const days = dyn.period ? all.filter(r => dayDiff(last, r.key) < dyn.period) : all;
-  const Rg = ranges(dyn.scope), [mk, mn, unit] = DYN_METRICS.find(x => x[0] === dyn.metric);
-  const range = Object.assign([...Rg[mk]], { isK: mk === 'k' }), min = !dyn.scope && mk === 'f' ? Rg.fMin : null;
-  const pts = days.map(r => { const v = dayVals(r, dyn.scope); return { r, v: v ? v[mk] : null }; });
-  const vals = pts.filter(p => p.v != null).map(p => p.v);
-  const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
-  const aL = mk === 'k' ? lvlK(avg, range) : lvl(avg, range[0], range[1], min);
+  const Rg = ranges(dyn.scope), scopeN = dyn.scope ? ' · ' + MEALS.find(m => m.key === dyn.scope).n.toLowerCase() : '';
+  const fMin = dyn.scope ? null : Rg.fMin;
   const chip = (act, v, cur, label) => `<button class="chip" data-act="${act}" data-v="${v}" aria-pressed="${String(v) === String(cur)}">${label}</button>`;
   h += `<div class="dyn-ctl">
       <div class="gchips">${[[7, '7 дней'], [14, '14 дней'], [30, '30 дней'], [0, 'Все']].map(([v, l]) => chip('dyn-p', v, dyn.period, l)).join('')}</div>
       <div class="gchips">${chip('dyn-s', '', dyn.scope, 'Весь день')}${MEALS.map(m => chip('dyn-s', m.key, dyn.scope, m.n)).join('')}</div>
-      <div class="segs seg4" role="tablist">${DYN_METRICS.map(([k, n]) => `<button role="tab" data-act="dyn-m" data-v="${k}" aria-selected="${dyn.metric === k}">${n}</button>`).join('')}</div>
     </div>
     <div class="card chart-card">
-      <div class="chart-h"><b>${mn}${dyn.scope ? ' · ' + MEALS.find(m => m.key === dyn.scope).n.toLowerCase() : ''}</b><span class="num">норма ${range[0]}–${range[1]} ${unit}</span></div>
-      ${chartSVG(pts, range, min)}
-      <p class="chart-info num" id="dinfo">${dyn.sel != null && pts[dyn.sel] ? selInfo(pts[dyn.sel], range, min, unit) : 'Нажмите на столбик — покажу значение дня.'}</p>
-      ${avg != null ? `<p class="chart-avg num">В среднем за ${vals.length} ${plural(vals.length, 'день', 'дня', 'дней')}: <b>${f0(avg)} ${unit}</b> <span class="stp lv-${aL.cls}">${lvlText(aL, unit)}</span></p>` : ''}
-      ${LEGEND}
+      <div class="chart-h"><b>КБЖУ по дням${scopeN}</b><span>в % от нормы</span></div>
+      <div class="mlegend">${MET.map(([mk, n]) => `<button class="mchip" data-act="dyn-t" data-v="${mk}" aria-pressed="${!dyn.hide.includes(mk)}"><i class="sw m-${mk}"></i><span>${n}</span><small class="num">${Rg[mk][0]}–${Rg[mk][1]}</small></button>`).join('')}</div>
+      ${lineSVG(days, Rg)}
+      <div id="dinfo">${dyn.sel != null && days[dyn.sel] ? selInfo(days[dyn.sel], Rg) : '<p class="chart-info">Нажмите на день — покажу все показатели.</p>'}</div>
+      <p class="rule-hint chart-note">100% — цель, цветные отрезки справа — нормы. Нажмите на показатель, чтобы скрыть линию.${days.some(partialDay) ? ' * — день внесён не полностью, без оценки.' : ''} Кольцо — вне нормы:</p>
+      ${RING_LEGEND}
     </div>`;
-  // таблица дней
-  h += `<div class="sec-h">По дням${dyn.scope ? ' · ' + MEALS.find(m => m.key === dyn.scope).n.toLowerCase() : ''}</div><div class="card mtable">
+  // таблица дней + среднее за период
+  const fullDays = days.filter(r => !partialDay(r));
+  const filledV = (fullDays.length ? fullDays : days).map(r => dayVals(r, dyn.scope)).filter(Boolean);
+  const hasPartial = days.some(partialDay);
+  const c = (x, rr, mm) => `<span class="cell lv-${lvl(x, rr[0], rr[1], mm).cls}">${f0(x)}</span>`;
+  const ck = x => `<span class="cell lv-${lvlK(x, Rg.k).cls}">${f0(x)}</span>`;
+  // неполный день — без оценки цветом
+  const row = (v, first, plain) => plain ? first + ['k', 'p', 'f', 'c'].map(k => `<span class="cell">${f0(v[k])}</span>`).join('') : `${first}${ck(v.k)}${c(v.p, Rg.p)}${c(v.f, Rg.f, fMin)}${c(v.c, Rg.c)}`;
+  let avgRow = '';
+  if (filledV.length > 1) {
+    const av = ['k', 'p', 'f', 'c'].reduce((o, k) => (o[k] = filledV.reduce((a, v) => a + v[k], 0) / filledV.length, o), {});
+    avgRow = `<div class="mrow num avgrow">${row(av, `<span class="mn">Среднее<small>${filledV.length} ${plural(filledV.length, 'день', 'дня', 'дней')}</small></span>`)}</div>`;
+  }
+  h += `<div class="sec-h">По дням${scopeN}</div><div class="card mtable">
     <div class="mrow mhead num"><span></span><span>ккал</span><span>Б</span><span>Ж</span><span>У</span></div>
-    ${[...pts].reverse().map(({ r }) => { const v = dayVals(r, dyn.scope); if (!v) return `<div class="mrow num empty"><span class="mn">${esc(shortDate(r))}</span><span class="mempty">не внесено</span></div>`;
-      const c = (x, rr, mm) => `<span class="cell lv-${lvl(x, rr[0], rr[1], mm).cls}">${f0(x)}</span>`;
-      return `<button class="mrow num drow" data-act="rep-open" data-id="${r.id}"><span class="mn">${esc(shortDate(r))}</span>${c(v.k, Rg.k)}${c(v.p, Rg.p)}${c(v.f, Rg.f, dyn.scope ? null : Rg.fMin)}${c(v.c, Rg.c)}</button>`; }).join('')}
-  </div><p class="rule-hint page-foot">Нажмите на день — откроется его разбор.</p>`;
+    ${avgRow}
+    ${[...days].reverse().map(r => { const v = dayVals(r, dyn.scope); if (!v) return `<div class="mrow num empty"><span class="mn">${esc(shortDate(r))}</span><span class="mempty">не внесено</span></div>`;
+      return `<button class="mrow num drow" data-act="rep-open" data-id="${r.id}">${row(v, `<span class="mn">${esc(shortDate(r))}${partialDay(r) ? `<small>нет: ${missing(r).join(', ').toLowerCase()}</small>` : ''}</span>`, partialDay(r))}</button>`; }).join('')}
+  </div><p class="rule-hint page-foot">Нажмите на день — откроется его разбор.${hasPartial ? ' Неполные дни (не внесён завтрак, обед или ужин) в средние не входят.' : ''}</p>`;
   // недели
   const weeks = {};
-  for (const r of all) { const v = dayVals(r, dyn.scope); if (!v) continue; const w = mondayKey(r.key); (weeks[w] = weeks[w] || []).push(v); }
+  for (const r of all) { const v = dayVals(r, dyn.scope); if (!v || partialDay(r)) continue; const w = mondayKey(r.key); (weeks[w] = weeks[w] || []).push(v); }
   const wk = Object.entries(weeks).sort((a, b) => b[0].localeCompare(a[0])).map(([w, list]) => ({ w, n: list.length, avg: ['k', 'p', 'f', 'c'].reduce((o, k) => (o[k] = list.reduce((a, v) => a + v[k], 0) / list.length, o), {}) }));
   if (wk.length) {
     h += `<div class="sec-h">Средние по неделям</div><div class="card mtable">
       <div class="mrow mhead num"><span></span><span>ккал</span><span>Б</span><span>Ж</span><span>У</span></div>
-      ${wk.map((x, i) => { const prev = wk[i + 1]; const c = (k, rr, mm) => `<span class="cell lv-${lvl(x.avg[k], rr[0], rr[1], mm).cls}">${f0(x.avg[k])}${prev ? `<small class="dlt">${sign(x.avg[k] - prev.avg[k])}</small>` : ''}</span>`;
+      ${wk.map((x, i) => { const prev = wk[i + 1];
+        const cw = (k, L) => `<span class="cell lv-${L.cls}">${f0(x.avg[k])}${prev ? `<small class="dlt">${sign(x.avg[k] - prev.avg[k])}</small>` : ''}</span>`;
         const d0 = keyDate(x.w), d1 = new Date(d0); d1.setDate(d1.getDate() + 6);
         const lbl = d0.getDate() + '–' + d1.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
-        return `<div class="mrow num wrow"><span class="mn">${lbl}<small>${x.n} ${plural(x.n, 'день', 'дня', 'дней')}</small></span>${c('k', Rg.k)}${c('p', Rg.p)}${c('f', Rg.f, dyn.scope ? null : Rg.fMin)}${c('c', Rg.c)}</div>`; }).join('')}
+        return `<div class="mrow num wrow"><span class="mn">${lbl}<small>${x.n} ${plural(x.n, 'день', 'дня', 'дней')}</small></span>${['k', 'p', 'f', 'c'].map(k => cw(k, metLvl(k, x.avg[k], Rg, dyn.scope))).join('')}</div>`; }).join('')}
     </div><p class="rule-hint page-foot">Маленькие цифры — разница со средним прошлой недели.</p>`;
   }
   return h;
 }
-function selInfo(p, range, min, unit) {
-  if (p.v == null) return `${esc(shortDate(p.r))}: не внесено.`;
-  const L = range.isK ? lvlK(p.v, range) : lvl(p.v, range[0], range[1], min);
-  return `${esc(shortDate(p.r))}: <b>${f0(p.v)} ${unit}</b> — ${lvlText(L, unit)}.`;
+// выбранный день: все четыре показателя с уровнем
+function selInfo(r, Rg) {
+  const v = dayVals(r, dyn.scope);
+  if (!v) return `<p class="chart-info">${esc(shortDate(r))}: не внесено.</p>`;
+  return `<div class="dsel"><div class="dsel-h"><b>${esc(shortDate(r))}${partialDay(r) ? ` <small>не внесено: ${missing(r).join(', ').toLowerCase()}</small>` : ''}</b><button class="linkbtn" data-act="rep-open" data-id="${r.id}">Разбор дня</button></div>
+    ${MET.map(([mk, n, u]) => { const L = metLvl(mk, v[mk], Rg, dyn.scope); return `<div class="dsel-r"><i class="sw m-${mk}"></i><span>${n}</span><b class="num">${f0(v[mk])} ${u}</b><span class="stp lv-${L.cls} num">${lvlText(L, u)}</span></div>`; }).join('')}</div>`;
 }
-// столбики по дням: цвет — уровень отклонения, полоса — норма; без второй оси
-function chartSVG(pts, range, min) {
-  const W = 340, H = 190, L = 34, Rp = 6, Tp = 16, B = 30, pw = W - L - Rp, ph = H - Tp - B;
-  const vals = pts.filter(p => p.v != null).map(p => p.v);
-  const top = Math.max(range[1] * 1.15, ...vals, 1);
-  const step = niceStep(top / 4), max = Math.ceil(top / step) * step;
-  const y = v => Tp + ph - (v / max) * ph;
-  const n = pts.length, slot = pw / n, bw = Math.max(4, Math.min(24, slot - 4));
-  let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="График по дням">`;
-  for (let v = 0; v <= max + 0.001; v += step) s += `<line class="grid" x1="${L}" x2="${W - Rp}" y1="${y(v)}" y2="${y(v)}"/><text class="ax" x="${L - 5}" y="${y(v) + 3.5}" text-anchor="end">${f0(v)}</text>`;
-  s += `<rect class="band" x="${L}" width="${pw}" y="${y(range[1])}" height="${Math.max(1, y(range[0]) - y(range[1]))}"/>`;
-  const showVals = n <= 8;
-  pts.forEach((p, i) => {
-    const cx = L + i * slot + slot / 2, x0 = cx - bw / 2;
-    const d = keyDate(p.r.key), lab = d.getDate(), wd = d.toLocaleDateString('ru-RU', { weekday: 'short' });
-    if (n <= 16 || i % Math.ceil(n / 12) === 0) s += `<text class="ax" x="${cx}" y="${H - 16}" text-anchor="middle">${lab}</text>` + (n <= 10 ? `<text class="ax wd" x="${cx}" y="${H - 5}" text-anchor="middle">${wd}</text>` : '');
-    if (p.v == null) { s += `<text class="ax" x="${cx}" y="${y(0) - 4}" text-anchor="middle">—</text>`; }
-    else {
-      const yt = y(p.v), y0 = y(0), r = Math.min(4, bw / 2, (y0 - yt) / 2);
-      const Lv = lvl(p.v, range[0], range[1], min);
-      s += `<path class="barp lv-${Lv.cls} ${dyn.sel === i ? 'sel' : ''}" d="M${x0},${y0} L${x0},${yt + r} Q${x0},${yt} ${x0 + r},${yt} L${x0 + bw - r},${yt} Q${x0 + bw},${yt} ${x0 + bw},${yt + r} L${x0 + bw},${y0} Z"/>`;
-      if (showVals || dyn.sel === i) s += `<text class="val" x="${cx}" y="${yt - 4}" text-anchor="middle">${f0(p.v)}</text>`;
-    }
-    s += `<rect class="hit" data-act="dsel" data-i="${i}" x="${L + i * slot}" y="${Tp}" width="${slot}" height="${ph + B}"/>`;
+// линии всех показателей на одной шкале: % от середины нормы (100% — цель), без второй оси.
+// Норма каждого — цветной отрезок справа; одна видимая линия — полоса нормы во всю ширину.
+// Точка вне нормы — в кольце цвета уровня (недобор — красные, перебор — жёлтый/оранжевый).
+function lineSVG(days, Rg) {
+  const W = 310, H = 224, L = 36, Rp = 50, Tp = 10, B = 30, pw = W - L - Rp, ph = H - Tp - B;
+  const n = days.length, slot = pw / n, X = i => L + slot * i + slot / 2;
+  const vis = MET.filter(m => !dyn.hide.includes(m[0]));
+  const vals = days.map(r => dayVals(r, dyn.scope));
+  const P = (mk, v) => v / midOf(Rg, mk) * 100;
+  let lo = 80, hi = 120;
+  for (const [mk] of vis) {
+    lo = Math.min(lo, P(mk, Rg[mk][0])); hi = Math.max(hi, P(mk, Rg[mk][1]));
+    for (const v of vals) if (v && v[mk] != null) { const p = P(mk, v[mk]); lo = Math.min(lo, p); hi = Math.max(hi, p); }
+  }
+  const span = hi - lo, step = span <= 60 ? 10 : span <= 120 ? 20 : span <= 220 ? 25 : 50;
+  const y0 = Math.max(0, Math.floor(lo / step) * step), y1 = Math.ceil(hi / step) * step;
+  const Y = p => Tp + ph - (p - y0) / (y1 - y0) * ph;
+  const r1 = v => Math.round(v * 10) / 10;
+  let s = `<svg class="chart lchart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Калории, белок, жиры и углеводы по дням, в процентах от нормы">`;
+  if (vis.length === 1) { const mk = vis[0][0], a = Y(P(mk, Rg[mk][1])), b = Y(P(mk, Rg[mk][0])); s += `<rect class="bd bd-${mk}" x="${L}" width="${pw}" y="${r1(a)}" height="${r1(Math.max(2, b - a))}"/>`; }
+  for (let v = y0; v <= y1 + 0.001; v += step) s += `<line class="grid${v === 100 ? ' ref' : ''}" x1="${L}" x2="${L + pw}" y1="${r1(Y(v))}" y2="${r1(Y(v))}"/><text class="ax${v === 100 ? ' refl' : ''}" x="${L - 5}" y="${r1(Y(v) + 3.5)}" text-anchor="end">${v}%</text>`;
+  // нормы справа
+  vis.forEach(([mk], j) => { const x = L + pw + 6 + j * 5; s += `<line class="br br-${mk}" x1="${x}" x2="${x}" y1="${r1(Y(P(mk, Rg[mk][1])))}" y2="${r1(Y(P(mk, Rg[mk][0])))}"/>`; });
+  if (dyn.sel != null && dyn.sel < n) s += `<line class="cross" x1="${r1(X(dyn.sel))}" x2="${r1(X(dyn.sel))}" y1="${Tp}" y2="${Tp + ph}"/>`;
+  // подписи дней
+  days.forEach((r, i) => {
+    const d = keyDate(r.key), lab = d.getDate(), wd = d.toLocaleDateString('ru-RU', { weekday: 'short' });
+    if (n <= 16 || i % Math.ceil(n / 12) === 0) s += `<text class="ax${dyn.sel === i ? ' refl' : ''}" x="${r1(X(i))}" y="${H - 16}" text-anchor="middle">${lab}${partialDay(r) ? '*' : ''}</text>` + (n <= 10 ? `<text class="ax wd" x="${r1(X(i))}" y="${H - 5}" text-anchor="middle">${wd}</text>` : '');
   });
-  s += `<line class="base" x1="${L}" x2="${W - Rp}" y1="${y(0)}" y2="${y(0)}"/></svg>`;
-  return s;
+  // линии (разрыв там, где приём не внесён)
+  for (const [mk] of vis) {
+    let d = '', pen = false;
+    vals.forEach((v, i) => { if (!v || v[mk] == null) { pen = false; return; } d += (pen ? 'L' : 'M') + r1(X(i)) + ',' + r1(Y(P(mk, v[mk]))); pen = true; });
+    if (d) s += `<path class="ln ln-${mk}" d="${d}"/>`;
+  }
+  // точки и кольца уровня
+  const big = n <= 14;
+  for (const [mk] of vis) vals.forEach((v, i) => {
+    if (!v || v[mk] == null) return;
+    const cx = r1(X(i)), cy = r1(Y(P(mk, v[mk]))), Lv = metLvl(mk, v[mk], Rg, dyn.scope), sel = dyn.sel === i, part = partialDay(days[i]);
+    if (part) { s += `<circle class="pt hollow ln-${mk}" cx="${cx}" cy="${cy}" r="${sel ? 4.5 : big ? 3.5 : 2.4}"/>`; return; }
+    if (Lv.cls !== 'ok' && Lv.cls !== 'na') s += `<circle class="ring lv-${Lv.cls}" cx="${cx}" cy="${cy}" r="${big || sel ? 6.5 : 4.5}"/>`;
+    s += `<circle class="pt pt-${mk}" cx="${cx}" cy="${cy}" r="${sel ? 4.5 : big ? 3.5 : 2.4}"/>`;
+  });
+  // подписи у конца линий — разведены по высоте
+  const ends = vis.map(([mk, , , short]) => { for (let i = n - 1; i >= 0; i--) if (vals[i] && vals[i][mk] != null) return { mk, short, y: Y(P(mk, vals[i][mk])) }; return null; }).filter(Boolean).sort((a, b) => a.y - b.y);
+  for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 12) ends[i].y = ends[i - 1].y + 12;
+  for (let i = ends.length - 1; i >= 0; i--) ends[i].y = Math.min(ends[i].y, i === ends.length - 1 ? Tp + ph : ends[i + 1].y - 12);
+  for (let i = 0; i < ends.length; i++) ends[i].y = Math.max(ends[i].y, i === 0 ? Tp + 4 : ends[i - 1].y + 12);
+  const lx = L + pw + 6 + vis.length * 5 + 3;
+  for (const e of ends) s += `<circle class="pt pt-${e.mk}" cx="${r1(lx + 3)}" cy="${r1(e.y)}" r="3"/><text class="elab" x="${r1(lx + 9)}" y="${r1(e.y + 3.5)}">${e.short}</text>`;
+  // зоны касания — шире точки, на весь день
+  days.forEach((r, i) => { s += `<rect class="hit" data-act="dsel" data-i="${i}" x="${r1(L + i * slot)}" y="0" width="${r1(slot)}" height="${H}"/>`; });
+  return s + '</svg>';
 }
 function niceStep(x) { const p = Math.pow(10, Math.floor(Math.log10(x || 1))), m = x / p; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10) * p; }
 function eff(x) { return x.k ? x.p * 100 / x.k : 0; }
@@ -1207,7 +1407,7 @@ document.addEventListener('click', e => {
     case 'rep-open': view.rid = b.dataset.id; view.tab = 'report'; try { history.replaceState(null, '', '#report'); } catch (_) { } render(); window.scrollTo(0, 0); break;
     case 'dyn-p': dyn.period = +b.dataset.v; dyn.sel = null; render(); break;
     case 'dyn-s': dyn.scope = b.dataset.v; dyn.sel = null; render(); break;
-    case 'dyn-m': dyn.metric = b.dataset.v; render(); break;
+    case 'dyn-t': toggleMetric(b.dataset.v); render(); break;
     case 'dsel': dyn.sel = dyn.sel === +b.dataset.i ? null : +b.dataset.i; render(); break;
     case 'rep-del': { pushUndo(); S.reports = S.reports.filter(r => r.id !== b.dataset.id); if (view.rid === b.dataset.id) view.rid = null; commit(); toast('Разбор удалён', true); break; }
     case 'padd': proteinForm(); break;
