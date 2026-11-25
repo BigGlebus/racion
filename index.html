@@ -718,7 +718,7 @@ function renderReport() {
     <form id="lform" class="card load" novalidate>
       <label class="fld"><span>Ссылка на отчёт FatSecret (PDF)</span><input id="link" type="url" inputmode="url" autocomplete="off" placeholder="https://foods.fatsecret.com/export/…"></label>
       <div class="load-row"><button class="primary" type="submit">Разобрать</button><label class="ghost filebtn">Выбрать PDF<input id="pdf" type="file" accept="application/pdf,.pdf"></label></div>
-      <p class="rule-hint" id="lmsg">Выберите PDF отчёта (в FatSecret: отчёт → «Поделиться» → «Сохранить в Файлы») или вставьте ссылку.</p>
+      <p class="rule-hint" id="lmsg">Вставьте ссылку на отчёт за день или выберите сохранённый PDF.</p>
     </form>`;
   if (reps.length) h += `<div class="gchips reps">${reps.map(r => `<span class="chip rep ${r === R ? 'on' : ''}"><button data-act="rep" data-id="${r.id}">${esc(shortDate(r))}</button><button class="rx" data-act="rep-del" data-id="${r.id}" aria-label="Удалить разбор">×</button></span>`).join('')}</div>`;
   if (!R) return h + `<div class="card empty-state"><b>Здесь будет разбор дня</b><p>Таблица по приёмам, отклонения от нормы, откуда лишний жир и где не хватает белка, что поправить — и что съесть до конца дня, если приём ещё не внесён.</p></div>`;
@@ -851,21 +851,24 @@ async function loadBuffer(buf, how) {
     toast('Разобран отчёт: ' + (shortDate(rep) || 'день'));
   } catch (e) { setMsg(e.message || 'Не получилось прочитать отчёт', true); }
 }
+// FatSecret не разрешает сайтам читать отчёт, если браузер шлёт заголовок priority (а браузеры шлют его всегда),
+// поэтому отчёт скачивается через свой прокси на Cloudflare (код — tools/proxy-worker.js)
+const PROXY = 'https://racion-proxy.speertraeger17.workers.dev/';
 async function loadLink(url) {
-  if (!/^https:\/\/[a-z0-9.-]*fatsecret\.[a-z.]+\//i.test(url)) { setMsg('Нужна ссылка на отчёт FatSecret — она начинается с https://foods.fatsecret.com/…', true); return; }
+  if (!/^https:\/\/[a-z0-9.-]*fatsecret\.[a-z.]+\/export\//i.test(url)) { setMsg('Нужна ссылка на отчёт FatSecret — она начинается с https://foods.fatsecret.com/export/…', true); return; }
   setMsg('Скачиваю отчёт…');
   let buf;
   try {
-    const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) throw new Error('http ' + res.status);
+    const res = await fetch(PROXY + '?url=' + encodeURIComponent(url), { cache: 'no-store' });
+    if (!res.ok) { const t = await res.text().catch(() => ''); throw new Error(t || 'Прокси ответил ' + res.status); }
     buf = await res.arrayBuffer();
   } catch (e) {
-    // FatSecret не разрешает сайтам читать отчёт, если браузер шлёт заголовок priority (а браузеры шлют его всегда),
-    // поэтому по ссылке напрямую не скачать — помогаем сохранить PDF и выбрать файл
+    // запасной путь: сохранить PDF и выбрать файл (в Claude внешние адреса закрыты — только так)
     const m = document.getElementById('lmsg');
     if (m) {
       m.classList.add('bad');
-      m.innerHTML = `FatSecret не даёт приложениям скачивать отчёт по ссылке напрямую. Откройте отчёт, нажмите «Поделиться» → «Сохранить в Файлы», затем здесь — «Выбрать PDF».
+      const why = window.claude ? 'В Claude приложение не может скачивать по ссылке.' : `Не удалось скачать отчёт${e && e.message && !/fetch|network|load/i.test(e.message) ? ': ' + esc(e.message) : ' — проверьте интернет'}.`;
+      m.innerHTML = `${why} Можно так: откройте отчёт, нажмите «Поделиться» → «Сохранить в Файлы», затем здесь — «Выбрать PDF».
         <a class="open-rep" href="${esc(url)}" target="_blank" rel="noopener">Открыть отчёт</a>`;
     }
     return;
