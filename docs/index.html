@@ -13,7 +13,7 @@
 <link rel="icon" href="icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
-<script>window.APP_VERSION = "25.11-305e12";</script>
+<script>window.APP_VERSION = "25.11-e326bd";</script>
 <title>Рацион дня</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
@@ -37,6 +37,8 @@
   --carb: #B4502C;
   --warn: #A8680F;
   --bad: #BF3434;
+  /* уровни отклонения: недобор — красный/светло-красный, перебор — жёлтый/оранжевый */
+  --u2: #D93636; --u1: #F09A9A; --o1: #EDBB1E; --o2: #EE8424;
   --scrim: rgba(16, 24, 18, .42);
   --shadow: 0 1px 2px rgba(20, 32, 24, .06), 0 6px 18px rgba(20, 32, 24, .06);
   --f-display: "Manrope", "Segoe UI", system-ui, sans-serif;
@@ -46,7 +48,7 @@
   :root:not([data-theme="light"]) {
     --bg: #101512; --surface: #19201B; --surface-2: #232C25; --ink: #E7EDE8; --muted: #95A399;
     --line: #2C372F; --accent: #5CBB81; --accent-ink: #0C1A11; --accent-soft: #1E3828;
-    --prot: #82A1F2; --fat: #E6B54A; --carb: #E38763; --warn: #E3A948; --bad: #F07272;
+    --prot: #82A1F2; --fat: #E6B54A; --carb: #E38763; --warn: #E3A948; --bad: #F07272; --u2: #F25C5C; --u1: #F2A3A3; --o1: #F2CD4A; --o2: #F59A45;
     --scrim: rgba(0, 0, 0, .6); --shadow: 0 1px 2px rgba(0, 0, 0, .3);
     color-scheme: dark;
   }
@@ -54,7 +56,7 @@
 :root[data-theme="dark"] {
   --bg: #101512; --surface: #19201B; --surface-2: #232C25; --ink: #E7EDE8; --muted: #95A399;
   --line: #2C372F; --accent: #5CBB81; --accent-ink: #0C1A11; --accent-soft: #1E3828;
-  --prot: #82A1F2; --fat: #E6B54A; --carb: #E38763; --warn: #E3A948; --bad: #F07272;
+  --prot: #82A1F2; --fat: #E6B54A; --carb: #E38763; --warn: #E3A948; --bad: #F07272; --u2: #F25C5C; --u1: #F2A3A3; --o1: #F2CD4A; --o2: #F59A45;
   --scrim: rgba(0, 0, 0, .6); --shadow: 0 1px 2px rgba(0, 0, 0, .3);
   color-scheme: dark;
 }
@@ -148,7 +150,7 @@ body.sheet-open { overflow: hidden; }
 
 /* вкладки */
 .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
-.tabs nav { max-width: 560px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); }
+.tabs nav { max-width: 560px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); }
 .tab { height: 58px; display: grid; place-items: center; align-content: center; gap: 2px; font-size: 11.5px; font-weight: 600; color: var(--muted); }
 .tab svg { width: 22px; height: 22px; }
 .tab[aria-current="page"] { color: var(--accent); }
@@ -427,6 +429,65 @@ body.sheet-open { overflow: hidden; }
 .meal-p { list-style: none; margin: 0; padding: 0; }
 .meal-p li { display: flex; justify-content: space-between; padding: 8px 0; border-top: 1px solid var(--line); }
 .meal-p li:first-child { border-top: 0; }
+
+/* ---------- уровни отклонения ---------- */
+.mbar i.lv-u2, .bar i.lv-u2, .lv-legend i.lv-u2 { background: var(--u2); }
+.barp.lv-u2 { fill: var(--u2); }
+.stp.lv-u2, .cell.lv-u2 { background: color-mix(in srgb, var(--u2) 28%, transparent); }
+.whyc.lv-u2 { border-left-color: var(--u2); }
+.mbar i.lv-u1, .bar i.lv-u1, .lv-legend i.lv-u1 { background: var(--u1); }
+.barp.lv-u1 { fill: var(--u1); }
+.stp.lv-u1, .cell.lv-u1 { background: color-mix(in srgb, var(--u1) 28%, transparent); }
+.whyc.lv-u1 { border-left-color: var(--u1); }
+.mbar i.lv-o1, .bar i.lv-o1, .lv-legend i.lv-o1 { background: var(--o1); }
+.barp.lv-o1 { fill: var(--o1); }
+.stp.lv-o1, .cell.lv-o1 { background: color-mix(in srgb, var(--o1) 28%, transparent); }
+.whyc.lv-o1 { border-left-color: var(--o1); }
+.mbar i.lv-o2, .bar i.lv-o2, .lv-legend i.lv-o2 { background: var(--o2); }
+.barp.lv-o2 { fill: var(--o2); }
+.stp.lv-o2, .cell.lv-o2 { background: color-mix(in srgb, var(--o2) 28%, transparent); }
+.whyc.lv-o2 { border-left-color: var(--o2); }
+.mbar i.lv-ok, .bar i.lv-ok, .lv-legend i.lv-ok { background: var(--accent); }
+.barp.lv-ok { fill: var(--accent); }
+.whyc.lv-ok { border-left-color: var(--accent); }
+.stp { justify-self: start; font-size: 11.5px; font-weight: 600; padding: 2px 7px; border-radius: 999px; white-space: nowrap; color: var(--ink); }
+.stp.lv-ok { background: var(--accent-soft); color: var(--accent); }
+.stp.lv-na { background: var(--surface-2); color: var(--muted); }
+.big-st { margin-left: auto; font-size: 13px; padding: 3px 9px; }
+.cell { justify-self: end; display: inline-block; min-width: 40px; padding: 2px 6px; border-radius: 7px; text-align: right; }
+.lv-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11px; color: var(--muted); }
+.lv-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
+/* почему так */
+.whys { display: grid; gap: 8px; }
+.whyc { background: var(--surface); border-radius: 16px; box-shadow: var(--shadow); padding: 12px 14px; border-left: 4px solid var(--line); }
+.why-h { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.why-h b { font-family: var(--f-display); font-size: 16px; }
+.why-h .num { color: var(--muted); font-size: 13px; margin-right: auto; }
+.whyc ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; font-size: 13.5px; }
+/* динамика */
+.dyn-ctl { display: grid; gap: 8px; margin-bottom: 12px; }
+.dyn-ctl .gchips { margin: 0; }
+.seg4 { grid-template-columns: repeat(4, 1fr); }
+.seg4 button { padding: 7px 2px; font-size: 13px; }
+.chart-card { display: grid; gap: 8px; }
+.chart-h { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.chart-h span { font-size: 12px; color: var(--muted); }
+.chart { width: 100%; height: auto; display: block; }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .base { stroke: var(--muted); stroke-width: 1; opacity: .6; }
+.chart .band { fill: var(--accent-soft); opacity: .8; }
+.chart .ax { fill: var(--muted); font-size: 9.5px; font-family: var(--f-body); }
+.chart .ax.wd { font-size: 8.5px; }
+.chart .val { fill: var(--ink); font-size: 9.5px; font-weight: 600; font-family: var(--f-body); }
+.chart .hit { fill: transparent; cursor: pointer; }
+.chart .barp.sel { stroke: var(--ink); stroke-width: 1.5; }
+.chart-info, .chart-avg { margin: 0; font-size: 13px; }
+.drow { width: 100%; border-top: 1px solid var(--line); text-align: right; }
+.drow:active { background: var(--surface-2); }
+.wrow { border-top: 1px solid var(--line); }
+.wrow .mn { display: grid; }
+.mn small { font-size: 11px; color: var(--muted); font-weight: 500; }
+.dlt { display: block; font-size: 10.5px; color: var(--muted); font-weight: 500; }
 </style>
 </head>
 <body>
@@ -549,6 +610,8 @@ const f0 = n => nf0.format(Math.round(n));
 const f1 = n => nf1.format(Math.round(n * 10) / 10);
 const esc = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 const sign = n => (n > 0 ? '+' : n < 0 ? '−' : '') + f0(Math.abs(n));
+// склонение: 1 день, 2 дня, 5 дней
+function plural(n, a, b, c) { const m10 = n % 10, m100 = n % 100; return m10 === 1 && m100 !== 11 ? a : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? b : c; }
 const uid = () => Math.random().toString(36).slice(2, 10);
 
 /* ---------- разбор PDF отчёта FatSecret ---------- */
@@ -558,6 +621,9 @@ const COLS = { 'Кал': 'k', 'Жир': 'f', 'Н/жир': 'sf', 'Углев': 'c
 const MONTHS = { января: 1, февраля: 2, марта: 3, апреля: 4, мая: 5, июня: 6, июля: 7, августа: 8, сентября: 9, октября: 10, ноября: 11, декабря: 12 };
 const num = s => parseFloat(String(s).replace(/\s/g, '').replace(',', '.'));
 const isNum = s => /^-?\d+(?:[.,]\d+)?$/.test(String(s).trim());
+// Разбирает дневной или недельный отчёт. Возвращает список дней: у каждого дня своя тёмная плашка с датой;
+// если день не влез на страницу, плашка повторяется на следующей — это тот же день.
+// В недельном отчёте первая страница — «Period Summary» (средние), её пропускаем: всё до первой даты не читаем.
 async function parseReport(buf) {
   if (!window.pdfjsLib) throw new Error('Не загрузилась библиотека чтения PDF — проверьте интернет и обновите страницу');
   const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
@@ -573,17 +639,18 @@ async function parseReport(buf) {
     const cols = hdr ? hdr.items.filter(i => COLS[i.s]).map(i => ({ key: COLS[i.s], cx: i.x + i.w / 2 })) : null;
     for (const l of pl) lines.push({ ...l, cols, hdr: l === hdr });
   }
-  const R = { date: '', key: '', meals: [], total: null };
-  let meal = null, last = null;
+  const days = [];
+  let day = null, meal = null, last = null;
   for (const l of lines) {
     const text = l.items.map(i => i.s).join(' ');
-    if (l.hdr || /^\(ккал\)/.test(text) || /Food Diary Report|fatsecret\.ru|^Страница \d+$/.test(text)) continue;
+    if (l.hdr || /^\(ккал\)/.test(text) || /Food Diary Report|fatsecret\.ru|^Страница \d+$|Period Summary|еднесуточн/.test(text)) continue;
     const dm = text.match(/^[а-яё]+,\s+([а-яё]+)\s+(\d{1,2}),\s+(\d{4})$/i);
     if (dm && MONTHS[dm[1].toLowerCase()]) {
-      if (!R.date) { R.date = text; R.key = dm[3] + '-' + String(MONTHS[dm[1].toLowerCase()]).padStart(2, '0') + '-' + dm[2].padStart(2, '0'); }
+      const key = dm[3] + '-' + String(MONTHS[dm[1].toLowerCase()]).padStart(2, '0') + '-' + dm[2].padStart(2, '0');
+      if (!day || day.key !== key) { day = { date: text, key, meals: [], total: null }; days.push(day); meal = null; last = null; }
       continue;
     }
-    if (!l.cols) continue;
+    if (!day || !l.cols) continue;
     const bound = Math.min(...l.cols.map(c => c.cx)) - 30; // левее — название, правее — цифры
     const name = l.items.filter(i => i.x < bound).map(i => i.s).join(' ').trim();
     const vals = {};
@@ -595,27 +662,30 @@ async function parseReport(buf) {
     }
     const has = Object.keys(vals).length > 0;
     const mDef = MEALS.find(m => m.key === name);
-    if (mDef && !has) { meal = { name: mDef.key, items: [], total: null }; R.meals.push(meal); last = null; continue; }
+    if (mDef && !has) { meal = { name: mDef.key, items: [], total: null }; day.meals.push(meal); last = null; continue; }
     if (name === 'Всего' && has) {
-      const t = { k: vals.k || 0, p: vals.p || 0, f: vals.f || 0, c: vals.c || 0 };
-      if (meal && !meal.total && meal.items.length) meal.total = t; else R.total = t;
+      const t = { k: vals.k || 0, p: vals.p || 0, f: vals.f || 0, c: vals.c || 0, sug: vals.sug ?? null, fib: vals.fib ?? null };
+      if (meal && !meal.total && meal.items.length) meal.total = t; else if (!day.total) day.total = t;
       last = null; continue;
     }
     if (has && meal) {
-      last = { n: name || '—', portion: '', k: vals.k ?? null, p: vals.p ?? null, f: vals.f ?? null, c: vals.c ?? null };
+      last = { n: name || '—', portion: '', k: vals.k ?? null, p: vals.p ?? null, f: vals.f ?? null, c: vals.c ?? null, sug: vals.sug ?? null, fib: vals.fib ?? null };
       meal.items.push(last); continue;
     }
     if (!has && name && last && !last.portion) last.portion = name;
   }
-  if (!R.meals.length) throw new Error('Не нашёл в файле приёмов пищи — это точно отчёт «Food Diary Report» из FatSecret?');
-  for (const m of R.meals) if (!m.total && m.items.length) m.total = sumItems(m.items);
-  if (!R.total) R.total = R.meals.reduce((a, m) => (m.total ? addT(a, m.total) : a), zeroT());
-  return R;
+  const out = days.filter(d => d.meals.some(m => m.items.length));
+  if (!out.length) throw new Error('Не нашёл в файле приёмов пищи — это точно отчёт «Food Diary Report» из FatSecret?');
+  for (const d of out) {
+    for (const m of d.meals) if (!m.total && m.items.length) m.total = sumItems(m.items);
+    if (!d.total) d.total = d.meals.reduce((a, m) => (m.total ? addT(a, m.total) : a), zeroT());
+  }
+  return out;
 }
 function zeroT() { return { k: 0, p: 0, f: 0, c: 0 }; }
 function addT(a, b) { a.k += b.k || 0; a.p += b.p || 0; a.f += b.f || 0; a.c += b.c || 0; return a; }
 function sumItems(items) { return items.reduce((a, it) => addT(a, it), zeroT()); }
-function grams(portion) { const m = String(portion || '').match(/(\d+(?:[.,]\d+)?)\s*(г|мл)\b/); return m ? num(m[1]) : null; }
+function grams(portion) { const m = String(portion || '').match(/(\d+(?:[.,]\d+)?)\s*(г|мл)(?![а-яё])/); return m ? num(m[1]) : null; }
 
 /* ---------- рекомендации по правилам ---------- */
 const RX = {
@@ -623,12 +693,12 @@ const RX = {
   cheese: /сыр(?!ок|ник|ки)/,
   sweet: /сырок|сырки|сгущ|вафл|печень|торт|пирожн|конфет|халв|круассан|пончик|мороженое|эклер|шоколад(?![^]*\b(7\d|8\d|9\d)%)/,
   nuts: /арахис|орех|миндал|кешью|фундук|фисташ|семечк|пекан/,
-  fried: /жарен|жарк|бризол|кляр|панир|\bфри\b|отбивн|шницел|наггетс|чебурек|беляш/,
-  deli: /колбас|ветчин|сосиск|сардельк|бекон|сало\b|буженин|карбонад/,
+  fried: /жарен|жарк|бризол|кляр|панир|(?<![а-яё])фри(?![а-яё])|отбивн|шницел|наггетс|чебурек|беляш/,
+  deli: /колбас|ветчин|сосиск|сардельк|бекон|сало(?![а-яё])|буженин|карбонад/,
   lean: /индейк|курин|грудк/,
   sauce: /майонез|сметан/,
   carbDish: /варени|пельмен|блин|пицц|шаурм|бургер|сэндвич|бутерброд|ролл|лаваш|пирож|манты|хинкал/,
-  alco: /пиво|вино|водк|виски|коньяк|сидр|ликер|ликёр|ром\b|джин\b/,
+  alco: /пиво|вино|водк|виски|коньяк|сидр|ликер|ликёр|(?<![а-яё])ром(?![а-яё])|джин(?![а-яё])/,
 };
 function itemRecs(meal, it) {
   const n = it.n.toLowerCase(), out = [];
@@ -653,15 +723,127 @@ function itemRecs(meal, it) {
   }
   return out;
 }
+// доля дня на приём: от неё считаются нормы приёма по калориям, жирам и углеводам
+const MEAL_SHARE = { 'Завтрак': 0.25, 'Обед': 0.30, 'Ужин': 0.30, 'Перекус/Другое': 0.15 };
+// диапазоны нормы: весь день или один приём
+function ranges(mealKey) {
+  const T = S.targets;
+  if (!mealKey) return { k: [T.k - 100, T.k + 100], p: T.p, f: T.f, c: T.c, fMin: T.fMin };
+  const s = MEAL_SHARE[mealKey], m = MEALS.find(x => x.key === mealKey);
+  const r = (a, b) => [Math.round(a * s), Math.round(b * s)];
+  return { k: r(T.k - 100, T.k + 100), p: m.p, f: r(T.f[0], T.f[1]), c: r(T.c[0], T.c[1]) };
+}
+// группы источников жира — чтобы сказать «откуда», а не только «сколько»
+function fatGroup(n) {
+  if (RX.sweet.test(n)) return 'Сладкое';
+  if (RX.oil.test(n) || /майонез|соус|заправк|сметан|сливк/.test(n)) return 'Масло, заправки, соусы';
+  if (RX.nuts.test(n)) return 'Орехи и семечки';
+  if (RX.cheese.test(n) || (RX.deli.test(n) && !RX.lean.test(n))) return 'Сыр, колбаса, ветчина';
+  if (/яйц|омлет|яичниц/.test(n)) return 'Яйца';
+  if (RX.fried.test(n)) return 'Жареное';
+  if (RX.carbDish.test(n)) return 'Вареники, сэндвичи, выпечка';
+  return 'Мясо, молочное и прочее';
+}
+// гарниры и хлеб — нормальная часть еды, их не ругаем за «калории без белка»
+const GARNISH = /рис(?![а-яё])|греч|картоф|батат|макарон|паста|спагет|хлеб|лаваш|булгур|кускус|овсян|каша|круп|перлов|пшен|киноа|лапш/;
+const SWEET_FRUIT = /сырок|сырки|сгущ|вафл|печень|торт|пирожн|конфет|халв|зефир|пастил|мармелад|варень|мёд|мед(?![а-яё])|сахар|шоколад|банан|яблок|груш|апельсин|мандарин|виноград|финик|изюм|кураг|сок|морс|компот|кола|лимонад/;
+const pct = x => f0(x * 100) + '%';
+const shortPortion = s => String(s || '').replace(/\s*\(.*?\)/g, '').trim();
+const listN = (arr, max = 3) => arr.slice(0, max).map(it => `${it.n.replace(/\s*\.\.\.$/, '…')} (${shortPortion(it.portion) || '—'})`).join(', ');
+
 function analyze(R) {
   const T = S.targets;
   const meals = MEALS.map(m => { const r = R.meals.find(x => x.name === m.key); const items = r ? r.items : []; return { ...m, items, total: items.length ? (r.total || sumItems(items)) : null }; });
   const recs = meals.flatMap(m => m.items.flatMap(it => itemRecs(m, it))).sort((a, b) => (b.warn ? -1 : 0) - (a.warn ? -1 : 0) || b.fat - a.fat);
-  const allItems = meals.flatMap(m => m.items.map(it => ({ ...it, meal: m.n })));
-  const fatTop = allItems.filter(it => (it.f || 0) >= 3).sort((a, b) => b.f - a.f).slice(0, 5);
+  const all = meals.flatMap(m => m.items.map(it => ({ ...it, meal: m.n })));
   const t = R.total, empty = meals.filter(m => !m.total);
   const rest = (empty.length || t.k < T.k - 300) ? restOfDay(t, empty) : null;
-  return { meals, recs, fatTop, t, empty, rest };
+  return { meals, recs, all, t, empty, rest, why: whyCards(t, meals, all, empty) };
+}
+
+// «Почему так»: по каждой метрике — что именно её сдвинуло
+function whyCards(t, meals, all, empty) {
+  const T = S.targets, Rg = ranges(), cards = [];
+  const filled = meals.filter(m => m.total);
+  const note = empty.length ? `Не внесено: ${empty.map(m => m.n.toLowerCase()).join(', ')} — итог неполный.` : '';
+  const sugar = all.reduce((a, it) => a + (it.sug || 0), 0);
+
+  // калории
+  {
+    const L = lvlK(t.k, Rg.k), lines = [];
+    if (note) lines.push(note);
+    const heavy = filled.map(m => ({ m, share: m.total.k / (t.k || 1), want: MEAL_SHARE[m.key] })).sort((a, b) => b.m.total.k - a.m.total.k);
+    for (const x of heavy) if (x.share > x.want + 0.08 && x.m.total.k > T.k * x.want * 1.25) lines.push(`${x.m.n}: ${f0(x.m.total.k)} ккал — ${pct(x.share)} дня, ориентир около ${pct(x.want)}.`);
+    const fatShare = t.k ? t.f * 9 / t.k : 0;
+    if (fatShare > 0.35) lines.push(`Жиры дали ${pct(fatShare)} калорий при ориентире ~30% — большая часть «лишних» калорий пришла с жиром.`);
+    if (sugar > 50) lines.push(`Сахара ≈ ${f0(sugar)} г — это ~${f0(sugar * 4)} ккал «быстрых» калорий.`);
+    const top = [...all].filter(it => it.k).sort((a, b) => b.k - a.k);
+    if (top.length) lines.push(`Самое калорийное: ${top.slice(0, 3).map(it => `${it.n.replace(/\s*\.\.\.$/, '…')} — ${f0(it.k)}`).join('; ')} ккал.`);
+    if (L.cls === 'ok') lines.unshift('Калории в цели.');
+    if (L.cls === 'o1' || L.cls === 'o2') lines.unshift(`На ${f0(t.k - T.k)} ккал больше цели — дефицит меньше задуманного, снижение замедлится.`);
+    if (L.cls === 'u1' || L.cls === 'u2') lines.unshift(empty.length ? 'Калорий пока меньше цели — день ещё не закончен.' : `До цели не хватило ${f0(Rg.k[0] - t.k)} ккал: при сильном дефиците тяжелее сохранить мышцы.`);
+    cards.push({ key: 'k', title: 'Калории', val: `${f0(t.k)} из ${f0(T.k)}`, unit: 'ккал', L, lines });
+  }
+  // белок
+  {
+    const L = lvl(t.p, T.p[0], T.p[1]), lines = [];
+    const lowMeals = filled.filter(m => m.total.p < m.p[0]);
+    const dense = all.filter(it => it.k && it.p && it.p * 100 / it.k >= 15).sort((a, b) => b.p - a.p);
+    const empt = all.filter(it => (it.k || 0) >= 100 && (it.p || 0) * 100 / it.k < 4 && !GARNISH.test(it.n.toLowerCase())).sort((a, b) => b.k - a.k);
+    if (L.cls === 'u1' || L.cls === 'u2') {
+      lines.push(`Не хватило ${f0(T.p[0] - t.p)} г белка.`);
+      if (lowMeals.length) lines.push(`Мало белка в приёмах: ${lowMeals.map(m => `${m.n.toLowerCase()} ${f0(m.total.p)} г (нужно ${m.p[0]}–${m.p[1]})`).join(', ')}.`);
+      if (dense.length) lines.push(`«Чистый» белок за день: ${dense.slice(0, 4).map(it => it.n.replace(/\s*\.\.\.$/, '…')).join(', ')} — всего ${f0(dense.reduce((a, it) => a + it.p, 0))} г.`);
+      else lines.push('За день не было ни одного «чистого» белкового продукта — курицы, индейки, рыбы, творога, скира.');
+      if (empt.length) {
+        const k = empt.reduce((a, it) => a + it.k, 0), p = empt.reduce((a, it) => a + (it.p || 0), 0);
+        lines.push(`Калории почти без белка: ${empt.slice(0, 4).map(it => it.n.replace(/\s*\.\.\.$/, '…')).join(', ')} — ${f0(k)} ккал, белка ${f0(p)} г. Те же калории в курице — это ~${f0(k * 23 / 110)} г белка.`);
+      }
+    } else if (L.cls === 'ok') {
+      lines.push('Белок в норме.');
+      if (dense.length) lines.push(`Больше всего дали: ${dense.slice(0, 3).map(it => it.n.replace(/\s*\.\.\.$/, '…')).join(', ')}.`);
+    } else lines.push('Белка больше нормы — это не страшно, если укладываетесь в калории.');
+    cards.push({ key: 'p', title: 'Белок', val: `${f0(t.p)} из ${T.p[0]}–${T.p[1]}`, unit: 'г', L, lines });
+  }
+  // жиры
+  {
+    const L = lvl(t.f, T.f[0], T.f[1], T.fMin), lines = [];
+    const groups = {};
+    for (const it of all) if (it.f) groups[fatGroup(it.n.toLowerCase())] = (groups[fatGroup(it.n.toLowerCase())] || 0) + it.f;
+    const gs = Object.entries(groups).sort((a, b) => b[1] - a[1]);
+    const top = all.filter(it => (it.f || 0) >= 3).sort((a, b) => b.f - a.f);
+    if (L.cls === 'o1' || L.cls === 'o2') {
+      lines.push(`Лишние ${f0(t.f - T.f[1])} г жира — это ~${f0((t.f - T.f[1]) * 9)} ккал.`);
+      lines.push(`По источникам: ${gs.slice(0, 4).map(([g, v]) => `${g.toLowerCase()} ${f0(v)} г (${pct(v / t.f)})`).join(', ')}.`);
+      if (top.length) lines.push(`Больше всего жира: ${top.slice(0, 3).map(it => `${it.n.replace(/\s*\.\.\.$/, '…')} — ${f1(it.f)} г`).join('; ')}.`);
+      const avoid = (groups['Масло, заправки, соусы'] || 0) + (groups['Сладкое'] || 0) + (groups['Жареное'] || 0);
+      if (avoid >= 10) lines.push(`Масло, соусы, сладкое и жарка вместе дали ${f0(avoid)} г — это самый простой резерв, без потери белка.`);
+    } else if (L.cls === 'ok') {
+      lines.push('Жиры в норме.');
+      if (gs.length) lines.push(`Основные источники: ${gs.slice(0, 3).map(([g, v]) => `${g.toLowerCase()} ${f0(v)} г`).join(', ')}.`);
+    } else lines.push(`Жиров мало: не опускайтесь ниже ${T.fMin} г — это нужно для гормонов. Подойдут рыба, яйца, 20 г орехов.`);
+    cards.push({ key: 'f', title: 'Жиры', val: `${f0(t.f)} из ${T.f[0]}–${T.f[1]}`, unit: 'г', L, lines });
+  }
+  // углеводы
+  {
+    const L = lvl(t.c, T.c[0], T.c[1]), lines = [];
+    const top = all.filter(it => (it.c || 0) >= 10).sort((a, b) => b.c - a.c);
+    const sf = all.filter(it => SWEET_FRUIT.test(it.n.toLowerCase()));
+    const sfC = sf.reduce((a, it) => a + (it.c || 0), 0);
+    if (L.cls === 'o1' || L.cls === 'o2') {
+      lines.push(`Лишние ${f0(t.c - T.c[1])} г углеводов — ~${f0((t.c - T.c[1]) * 4)} ккал.`);
+      if (top.length) lines.push(`Больше всего углеводов: ${top.slice(0, 3).map(it => `${it.n.replace(/\s*\.\.\.$/, '…')} — ${f0(it.c)} г`).join('; ')}.`);
+      if (sfC >= 30) lines.push(`Сладкое и фрукты: ${f0(sfC)} г углеводов (${listN(sf.sort((a, b) => b.c - a.c), 3)}).`);
+      const big = all.filter(it => (it.c || 0) >= 60 && !SWEET_FRUIT.test(it.n.toLowerCase()));
+      if (big.length) lines.push(`Большие порции: ${big.map(it => `${it.n.replace(/\s*\.\.\.$/, '…')} ${shortPortion(it.portion)} — ${f0(it.c)} г`).join('; ')}. Половина порции + белок рядом.`);
+    } else if (L.cls === 'ok') {
+      lines.push('Углеводы в норме.');
+      if (sfC >= 50) lines.push(`Из них сладкое и фрукты — ${f0(sfC)} г; лучше, чтобы основу давали крупы и хлеб.`);
+    } else lines.push(empty.length ? 'Углеводов пока мало — день не закончен.' : `Не хватило ${f0(T.c[0] - t.c)} г углеводов — добавьте гарнир: ~${f0((T.c[0] - t.c) / 0.7)} г крупы в сухом виде.`);
+    if (sugar > 0 && !lines.some(l => /Сахара/.test(l))) lines.push(`Сахара за день: ${f0(sugar)} г.`);
+    cards.push({ key: 'c', title: 'Углеводы', val: `${f0(t.c)} из ${T.c[0]}–${T.c[1]}`, unit: 'г', L, lines });
+  }
+  return cards;
 }
 // «до конца дня»: добрать белок постным продуктом из памятки, остаток калорий — гарниром
 function restOfDay(t, empty) {
@@ -700,6 +882,7 @@ const $app = document.getElementById('app'), $tabs = document.getElementById('ta
 const IC = {
   doc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>',
   prot: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 13c-2-2-2-5 0-7s5-2 7 0l5 5c2 2 2 5 0 7s-5 2-7 0z"/><path d="M9 10l5 5"/></svg>',
+  trend: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>',
   goal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
@@ -707,59 +890,74 @@ const IC = {
 };
 function render() {
   if (view.tab === 'report') $app.innerHTML = renderReport();
+  else if (view.tab === 'dyn') $app.innerHTML = renderDynamics();
   else if (view.tab === 'protein') $app.innerHTML = renderProtein();
   else $app.innerHTML = renderGoals();
-  $tabs.innerHTML = [['report', 'Разбор', IC.doc], ['protein', 'Белок', IC.prot], ['goals', 'Цели', IC.goal]]
+  $tabs.innerHTML = [['report', 'Разбор', IC.doc], ['dyn', 'Динамика', IC.trend], ['protein', 'Белок', IC.prot], ['goals', 'Цели', IC.goal]]
     .map(([k, n, ic]) => `<button class="tab" data-act="tab" data-tab="${k}" ${view.tab === k ? 'aria-current="page"' : ''}>${ic}<span>${n}</span></button>`).join('');
 }
-function statusOf(v, lo, hi, min) {
-  if (min != null && v < min) return ['bad', 'ниже ' + min, sign(v - lo)];
-  if (v < lo * 0.97) return ['low', 'мало', sign(v - lo)];
-  if (v > hi * 1.05) return ['high', 'много', sign(v - hi)];
-  return ['ok', 'норма', ''];
+// уровень отклонения от нормы:
+// u2 — сильный недобор (красный), u1 — недобор до 10% (светло-красный), ok — норма,
+// o1 — перебор до 10% (жёлтый), o2 — сильный перебор (оранжевый)
+function lvl(v, lo, hi, min) {
+  if (v == null) return { cls: 'na', txt: 'нет данных', dev: 0 };
+  if (min != null && v < min) return { cls: 'u2', txt: 'ниже ' + min, dev: v - lo };
+  if (v < lo) return { cls: (lo - v) / lo > 0.1 ? 'u2' : 'u1', txt: 'недобор', dev: v - lo };
+  if (v > hi) return { cls: (v - hi) / hi > 0.1 ? 'o2' : 'o1', txt: 'перебор', dev: v - hi };
+  return { cls: 'ok', txt: 'норма', dev: 0 };
 }
+// для калорий отклонение считаем от цели (середины нормы), а не от её границы
+function lvlK(v, r) { const L = lvl(v, r[0], r[1]); if (L.dev) L.dev = v - (r[0] + r[1]) / 2; return L; }
+const lvlText = (L, unit) => L.txt + (L.dev ? ' ' + sign(L.dev) + (unit ? ' ' + unit : '') : '');
 function macroBlock(cls, letter, v, range, min) {
-  const [lo, hi] = range, max = hi * 1.3;
-  const [st, txt, dev] = statusOf(v, lo, hi, min);
+  const [lo, hi] = range, max = hi * 1.3, L = lvl(v, lo, hi, min);
   return `<div class="mac">
     <div class="ml"><b class="k-${cls}">${letter}</b><span class="v num">${f0(v)}</span><small class="num">/ ${lo}–${hi}</small></div>
-    <div class="mbar"><span class="zone" style="left:${lo / max * 100}%;width:${(hi - lo) / max * 100}%"></span><i class="b-${cls}" style="width:${Math.min(100, v / max * 100)}%"></i></div>
-    <span class="st ${st} num">${txt}${dev ? ' · ' + dev + ' г' : ''}</span>
+    <div class="mbar"><span class="zone" style="left:${lo / max * 100}%;width:${(hi - lo) / max * 100}%"></span><i class="lv-${L.cls}" style="width:${Math.min(100, v / max * 100)}%"></i></div>
+    <span class="stp lv-${L.cls} num">${lvlText(L, 'г')}</span>
   </div>`;
 }
+const LEGEND = `<div class="lv-legend"><span><i class="lv-u2"></i>сильный недобор</span><span><i class="lv-u1"></i>недобор</span><span><i class="lv-ok"></i>норма</span><span><i class="lv-o1"></i>перебор</span><span><i class="lv-o2"></i>сильный перебор</span></div>`;
 
 function renderReport() {
   const reps = [...S.reports].sort((a, b) => (b.key || '').localeCompare(a.key || ''));
   const R = reps.find(r => r.id === view.rid) || reps[0];
   let h = `<h1 class="page-h">Разбор дня</h1>
     <form id="lform" class="card load" novalidate>
-      <label class="fld"><span>Ссылка на отчёт FatSecret (PDF)</span><input id="link" type="url" inputmode="url" autocomplete="off" placeholder="https://foods.fatsecret.com/export/…"></label>
+      <label class="fld"><span>Ссылка на отчёт FatSecret (PDF) — за день или за неделю</span><input id="link" type="url" inputmode="url" autocomplete="off" placeholder="https://foods.fatsecret.com/export/…"></label>
       <div class="load-row"><button class="primary" type="submit">Разобрать</button><label class="ghost filebtn">Выбрать PDF<input id="pdf" type="file" accept="application/pdf,.pdf"></label></div>
-      <p class="rule-hint" id="lmsg">Вставьте ссылку на отчёт за день или выберите сохранённый PDF.</p>
+      <p class="rule-hint" id="lmsg">Вставьте ссылку на отчёт или выберите сохранённый PDF. Недельный отчёт разложится по дням.</p>
     </form>`;
   if (reps.length) h += `<div class="gchips reps">${reps.map(r => `<span class="chip rep ${r === R ? 'on' : ''}"><button data-act="rep" data-id="${r.id}">${esc(shortDate(r))}</button><button class="rx" data-act="rep-del" data-id="${r.id}" aria-label="Удалить разбор">×</button></span>`).join('')}</div>`;
-  if (!R) return h + `<div class="card empty-state"><b>Здесь будет разбор дня</b><p>Таблица по приёмам, отклонения от нормы, откуда лишний жир и где не хватает белка, что поправить — и что съесть до конца дня, если приём ещё не внесён.</p></div>`;
-  const A = analyze(R), T = S.targets, t = A.t;
+  if (!R) return h + `<div class="card empty-state"><b>Здесь будет разбор дня</b><p>Итог против норм с отклонениями, почему не хватило белка или много жира, таблица по приёмам, что поправить — и что съесть до конца дня, если приём ещё не внесён.</p></div>`;
+  const A = analyze(R), T = S.targets, t = A.t, Rg = ranges();
+  const kL = lvlK(t.k, Rg.k);
   const left = T.k - t.k, scaleMax = Math.max(T.k * 1.15, t.k);
-  const leftTxt = Math.abs(left) <= 50 ? 'в цели' : left > 0 ? 'ещё ' + f0(left) : 'перебор ' + f0(-left);
+  const leftTxt = kL.cls === 'ok' ? 'в цели' : left > 0 ? 'ещё ' + f0(left) : 'перебор ' + f0(-left);
   h += `<div class="sum">
       <div class="sum-head"><span class="eyebrow">${esc(R.date || 'Отчёт')}</span>${A.empty.length ? `<span class="tagw">не внесено: ${A.empty.map(m => m.n.toLowerCase()).join(', ')}</span>` : ''}</div>
-      <div class="kline"><span class="big num">${f0(t.k)}</span><span class="of num">/ ${f0(T.k)} ккал</span><span class="left num ${left < -50 ? 'over' : ''}">${leftTxt}</span></div>
-      <div class="bar"><i class="eaten" style="width:${t.k / scaleMax * 100}%"></i><span class="tick" style="left:${T.k / scaleMax * 100}%"></span></div>
+      <div class="kline"><span class="big num">${f0(t.k)}</span><span class="of num">/ ${f0(T.k)} ккал</span><span class="stp big-st lv-${kL.cls} num">${leftTxt}</span></div>
+      <div class="bar"><i class="lv-${kL.cls}" style="width:${t.k / scaleMax * 100}%"></i><span class="tick" style="left:${T.k / scaleMax * 100}%"></span></div>
       <div class="macros">${macroBlock('p', 'Б', t.p, T.p)}${macroBlock('f', 'Ж', t.f, T.f, T.fMin)}${macroBlock('c', 'У', t.c, T.c)}</div>
+      ${LEGEND}
     </div>`;
+  // почему так
+  h += `<div class="sec-h">Почему так</div><div class="whys">${A.why.map(c => `<div class="whyc lv-${c.L.cls}">
+      <div class="why-h"><b>${c.title}</b><span class="num">${c.val} ${c.unit}</span><span class="stp lv-${c.L.cls} num">${lvlText(c.L, c.unit)}</span></div>
+      <ul>${c.lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul></div>`).join('')}</div>`;
   // по приёмам
   h += `<div class="sec-h">По приёмам</div><div class="card mtable">
     <div class="mrow mhead num"><span></span><span>ккал</span><span>Б</span><span>Ж</span><span>У</span></div>`;
   for (const m of A.meals) {
     if (!m.total) { h += `<div class="mrow num empty"><span class="mn">${m.n}</span><span class="mempty">не внесено</span></div>`; continue; }
-    const [st] = statusOf(m.total.p, m.p[0], m.p[1]);
-    h += `<details class="mdet"><summary class="mrow num"><span class="mn">${m.n}${IC.chev}</span><b>${f0(m.total.k)}</b><span class="pv ${st === 'low' ? 'low' : ''}">${f0(m.total.p)}</span><span>${f0(m.total.f)}</span><span>${f0(m.total.c)}</span></summary>
-      ${st === 'low' ? `<p class="mnote">Белка ${f0(m.total.p)} г из ${m.p[0]}–${m.p[1]} — добавьте: ${m.tip}.</p>` : ''}
+    const rg = ranges(m.key), cell = (v, r, d = 0) => { const L = lvl(v, r[0], r[1]); return `<span class="cell lv-${L.cls}" title="норма ${r[0]}–${r[1]}">${d ? f1(v) : f0(v)}</span>`; };
+    const pL = lvl(m.total.p, m.p[0], m.p[1]);
+    h += `<details class="mdet"><summary class="mrow num"><span class="mn">${m.n}${IC.chev}</span>${cell(m.total.k, rg.k)}${cell(m.total.p, rg.p)}${cell(m.total.f, rg.f)}${cell(m.total.c, rg.c)}</summary>
+      <p class="mnote num">Норма приёма: ${rg.k[0]}–${rg.k[1]} ккал · Б ${rg.p[0]}–${rg.p[1]} · Ж ${rg.f[0]}–${rg.f[1]} · У ${rg.c[0]}–${rg.c[1]}${pL.cls.startsWith('u') ? `. Белка мало — добавьте: ${m.tip}.` : ''}</p>
       <div class="mitems">${m.items.map(it => `<div class="mi num"><span class="mi-n">${esc(it.n)}<small>${esc(it.portion || '')}</small></span><span>${it.k != null ? f0(it.k) : '—'}</span><span>${it.p != null ? f1(it.p) : '—'}</span><span>${it.f != null ? f1(it.f) : '—'}</span><span>${it.c != null ? f1(it.c) : '—'}</span></div>`).join('')}</div>
     </details>`;
   }
-  h += `</div>`;
+  h += `</div><p class="rule-hint page-foot">Нормы приёма — доля дневной нормы: завтрак 25%, обед и ужин по 30%, перекус 15%. Нажмите на приём — покажу продукты.</p>`;
   // что поправить
   if (A.recs.length) {
     h += `<div class="sec-h">Что поправить</div><div class="recs">${A.recs.map(r => `<div class="rec ${r.warn ? 'warn' : ''}"><div class="rec-h"><b>${esc(r.title)}</b>${r.fat ? `<span class="pill num">−${f0(r.fat)} г жира</span>` : ''}${r.prot ? `<span class="pill num ok">+${f0(r.prot)} г белка</span>` : ''}</div><p>${esc(r.text)}</p><small>${esc(MEALS.find(m => m.key === r.meal)?.n || '')}</small></div>`).join('')}</div>`;
@@ -776,11 +974,6 @@ function renderReport() {
       <p class="rest-sum num">Получится за день: <b>${f0(after.k)} ккал</b> · Б ${f0(after.p)} · Ж ${f0(after.f)} · У ${f0(after.c)}</p>
       <p class="rule-hint">Белок — из первых постных продуктов вашей памятки «Белок». Без масла: жиров на сегодня осталось ${f0(Math.max(0, T.f[1] - t.f))} г.</p></div>`;
   }
-  // источники жира
-  if (A.fatTop.length) {
-    const mx = A.fatTop[0].f;
-    h += `<div class="sec-h">Откуда жир</div><div class="card fats">${A.fatTop.map(it => `<div class="fatrow"><span class="fn">${esc(it.n)}<small>${esc(it.meal)}${it.portion ? ' · ' + esc(it.portion) : ''}</small></span><span class="fb"><i style="width:${it.f / mx * 100}%"></i></span><b class="num">${f1(it.f)} г</b></div>`).join('')}</div>`;
-  }
   return h;
 }
 function shortDate(r) {
@@ -789,6 +982,99 @@ function shortDate(r) {
   return new Date(y, m - 1, d).toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' });
 }
 
+/* ---------- динамика: дни и недели, весь день или один приём ---------- */
+const DYN_METRICS = [['k', 'Калории', 'ккал'], ['p', 'Белок', 'г'], ['f', 'Жиры', 'г'], ['c', 'Углеводы', 'г']];
+let dyn = { period: 7, scope: '', metric: 'k', sel: null };
+const keyDate = k => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); };
+const dayDiff = (a, b) => Math.round((keyDate(a) - keyDate(b)) / 864e5);
+function mondayKey(k) { const d = keyDate(k), wd = (d.getDay() + 6) % 7; d.setDate(d.getDate() - wd); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+// значения дня: весь день или итог приёма (null — приём не внесён)
+function dayVals(r, scope) {
+  if (!scope) return r.total;
+  const m = r.meals.find(x => x.name === scope);
+  return m && m.items.length ? (m.total || sumItems(m.items)) : null;
+}
+function renderDynamics() {
+  const all = [...S.reports].filter(r => r.key).sort((a, b) => a.key.localeCompare(b.key));
+  let h = `<h1 class="page-h">Динамика</h1>`;
+  if (all.length < 2) return h + `<div class="card empty-state"><b>Нужно хотя бы два дня</b><p>Загрузите во вкладке «Разбор» отчёты за несколько дней — по ссылкам на дни или одним недельным отчётом FatSecret.</p></div>`;
+  const last = all[all.length - 1].key;
+  const days = dyn.period ? all.filter(r => dayDiff(last, r.key) < dyn.period) : all;
+  const Rg = ranges(dyn.scope), [mk, mn, unit] = DYN_METRICS.find(x => x[0] === dyn.metric);
+  const range = Object.assign([...Rg[mk]], { isK: mk === 'k' }), min = !dyn.scope && mk === 'f' ? Rg.fMin : null;
+  const pts = days.map(r => { const v = dayVals(r, dyn.scope); return { r, v: v ? v[mk] : null }; });
+  const vals = pts.filter(p => p.v != null).map(p => p.v);
+  const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+  const aL = mk === 'k' ? lvlK(avg, range) : lvl(avg, range[0], range[1], min);
+  const chip = (act, v, cur, label) => `<button class="chip" data-act="${act}" data-v="${v}" aria-pressed="${String(v) === String(cur)}">${label}</button>`;
+  h += `<div class="dyn-ctl">
+      <div class="gchips">${[[7, '7 дней'], [14, '14 дней'], [30, '30 дней'], [0, 'Все']].map(([v, l]) => chip('dyn-p', v, dyn.period, l)).join('')}</div>
+      <div class="gchips">${chip('dyn-s', '', dyn.scope, 'Весь день')}${MEALS.map(m => chip('dyn-s', m.key, dyn.scope, m.n)).join('')}</div>
+      <div class="segs seg4" role="tablist">${DYN_METRICS.map(([k, n]) => `<button role="tab" data-act="dyn-m" data-v="${k}" aria-selected="${dyn.metric === k}">${n}</button>`).join('')}</div>
+    </div>
+    <div class="card chart-card">
+      <div class="chart-h"><b>${mn}${dyn.scope ? ' · ' + MEALS.find(m => m.key === dyn.scope).n.toLowerCase() : ''}</b><span class="num">норма ${range[0]}–${range[1]} ${unit}</span></div>
+      ${chartSVG(pts, range, min)}
+      <p class="chart-info num" id="dinfo">${dyn.sel != null && pts[dyn.sel] ? selInfo(pts[dyn.sel], range, min, unit) : 'Нажмите на столбик — покажу значение дня.'}</p>
+      ${avg != null ? `<p class="chart-avg num">В среднем за ${vals.length} ${plural(vals.length, 'день', 'дня', 'дней')}: <b>${f0(avg)} ${unit}</b> <span class="stp lv-${aL.cls}">${lvlText(aL, unit)}</span></p>` : ''}
+      ${LEGEND}
+    </div>`;
+  // таблица дней
+  h += `<div class="sec-h">По дням${dyn.scope ? ' · ' + MEALS.find(m => m.key === dyn.scope).n.toLowerCase() : ''}</div><div class="card mtable">
+    <div class="mrow mhead num"><span></span><span>ккал</span><span>Б</span><span>Ж</span><span>У</span></div>
+    ${[...pts].reverse().map(({ r }) => { const v = dayVals(r, dyn.scope); if (!v) return `<div class="mrow num empty"><span class="mn">${esc(shortDate(r))}</span><span class="mempty">не внесено</span></div>`;
+      const c = (x, rr, mm) => `<span class="cell lv-${lvl(x, rr[0], rr[1], mm).cls}">${f0(x)}</span>`;
+      return `<button class="mrow num drow" data-act="rep-open" data-id="${r.id}"><span class="mn">${esc(shortDate(r))}</span>${c(v.k, Rg.k)}${c(v.p, Rg.p)}${c(v.f, Rg.f, dyn.scope ? null : Rg.fMin)}${c(v.c, Rg.c)}</button>`; }).join('')}
+  </div><p class="rule-hint page-foot">Нажмите на день — откроется его разбор.</p>`;
+  // недели
+  const weeks = {};
+  for (const r of all) { const v = dayVals(r, dyn.scope); if (!v) continue; const w = mondayKey(r.key); (weeks[w] = weeks[w] || []).push(v); }
+  const wk = Object.entries(weeks).sort((a, b) => b[0].localeCompare(a[0])).map(([w, list]) => ({ w, n: list.length, avg: ['k', 'p', 'f', 'c'].reduce((o, k) => (o[k] = list.reduce((a, v) => a + v[k], 0) / list.length, o), {}) }));
+  if (wk.length) {
+    h += `<div class="sec-h">Средние по неделям</div><div class="card mtable">
+      <div class="mrow mhead num"><span></span><span>ккал</span><span>Б</span><span>Ж</span><span>У</span></div>
+      ${wk.map((x, i) => { const prev = wk[i + 1]; const c = (k, rr, mm) => `<span class="cell lv-${lvl(x.avg[k], rr[0], rr[1], mm).cls}">${f0(x.avg[k])}${prev ? `<small class="dlt">${sign(x.avg[k] - prev.avg[k])}</small>` : ''}</span>`;
+        const d0 = keyDate(x.w), d1 = new Date(d0); d1.setDate(d1.getDate() + 6);
+        const lbl = d0.getDate() + '–' + d1.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+        return `<div class="mrow num wrow"><span class="mn">${lbl}<small>${x.n} ${plural(x.n, 'день', 'дня', 'дней')}</small></span>${c('k', Rg.k)}${c('p', Rg.p)}${c('f', Rg.f, dyn.scope ? null : Rg.fMin)}${c('c', Rg.c)}</div>`; }).join('')}
+    </div><p class="rule-hint page-foot">Маленькие цифры — разница со средним прошлой недели.</p>`;
+  }
+  return h;
+}
+function selInfo(p, range, min, unit) {
+  if (p.v == null) return `${esc(shortDate(p.r))}: не внесено.`;
+  const L = range.isK ? lvlK(p.v, range) : lvl(p.v, range[0], range[1], min);
+  return `${esc(shortDate(p.r))}: <b>${f0(p.v)} ${unit}</b> — ${lvlText(L, unit)}.`;
+}
+// столбики по дням: цвет — уровень отклонения, полоса — норма; без второй оси
+function chartSVG(pts, range, min) {
+  const W = 340, H = 190, L = 34, Rp = 6, Tp = 16, B = 30, pw = W - L - Rp, ph = H - Tp - B;
+  const vals = pts.filter(p => p.v != null).map(p => p.v);
+  const top = Math.max(range[1] * 1.15, ...vals, 1);
+  const step = niceStep(top / 4), max = Math.ceil(top / step) * step;
+  const y = v => Tp + ph - (v / max) * ph;
+  const n = pts.length, slot = pw / n, bw = Math.max(4, Math.min(24, slot - 4));
+  let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="График по дням">`;
+  for (let v = 0; v <= max + 0.001; v += step) s += `<line class="grid" x1="${L}" x2="${W - Rp}" y1="${y(v)}" y2="${y(v)}"/><text class="ax" x="${L - 5}" y="${y(v) + 3.5}" text-anchor="end">${f0(v)}</text>`;
+  s += `<rect class="band" x="${L}" width="${pw}" y="${y(range[1])}" height="${Math.max(1, y(range[0]) - y(range[1]))}"/>`;
+  const showVals = n <= 8;
+  pts.forEach((p, i) => {
+    const cx = L + i * slot + slot / 2, x0 = cx - bw / 2;
+    const d = keyDate(p.r.key), lab = d.getDate(), wd = d.toLocaleDateString('ru-RU', { weekday: 'short' });
+    if (n <= 16 || i % Math.ceil(n / 12) === 0) s += `<text class="ax" x="${cx}" y="${H - 16}" text-anchor="middle">${lab}</text>` + (n <= 10 ? `<text class="ax wd" x="${cx}" y="${H - 5}" text-anchor="middle">${wd}</text>` : '');
+    if (p.v == null) { s += `<text class="ax" x="${cx}" y="${y(0) - 4}" text-anchor="middle">—</text>`; }
+    else {
+      const yt = y(p.v), y0 = y(0), r = Math.min(4, bw / 2, (y0 - yt) / 2);
+      const Lv = lvl(p.v, range[0], range[1], min);
+      s += `<path class="barp lv-${Lv.cls} ${dyn.sel === i ? 'sel' : ''}" d="M${x0},${y0} L${x0},${yt + r} Q${x0},${yt} ${x0 + r},${yt} L${x0 + bw - r},${yt} Q${x0 + bw},${yt} ${x0 + bw},${yt + r} L${x0 + bw},${y0} Z"/>`;
+      if (showVals || dyn.sel === i) s += `<text class="val" x="${cx}" y="${yt - 4}" text-anchor="middle">${f0(p.v)}</text>`;
+    }
+    s += `<rect class="hit" data-act="dsel" data-i="${i}" x="${L + i * slot}" y="${Tp}" width="${slot}" height="${ph + B}"/>`;
+  });
+  s += `<line class="base" x1="${L}" x2="${W - Rp}" y1="${y(0)}" y2="${y(0)}"/></svg>`;
+  return s;
+}
+function niceStep(x) { const p = Math.pow(10, Math.floor(Math.log10(x || 1))), m = x / p; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10) * p; }
 function eff(x) { return x.k ? x.p * 100 / x.k : 0; }
 function renderProtein() {
   const list = proteins();
@@ -856,16 +1142,18 @@ function rangeRow(key, name, sub, [lo, hi]) {
 
 /* ---------- загрузка отчёта ---------- */
 function setMsg(text, bad) { const m = document.getElementById('lmsg'); if (m) { m.textContent = text; m.classList.toggle('bad', !!bad); } }
-async function loadBuffer(buf, how) {
+async function loadBuffer(buf) {
   setMsg('Читаю отчёт…');
   try {
-    const R = await parseReport(buf);
+    const days = await parseReport(buf);
     pushUndo();
-    const rep = { id: uid(), addedAt: Date.now(), ...R };
-    S.reports = [rep, ...S.reports.filter(r => !(r.key && r.key === R.key))].slice(0, 14);
-    view.rid = rep.id;
+    for (const R of days) S.reports = [{ id: uid(), addedAt: Date.now(), ...R }, ...S.reports.filter(r => !(r.key && r.key === R.key))];
+    S.reports.sort((a, b) => (b.key || '').localeCompare(a.key || ''));
+    S.reports = S.reports.slice(0, 120);
+    const newest = days.map(d => d.key).sort().pop();
+    view.rid = (S.reports.find(r => r.key === newest) || S.reports[0]).id;
     commit();
-    toast('Разобран отчёт: ' + (shortDate(rep) || 'день'));
+    toast(days.length > 1 ? `Разобрано дней: ${days.length} — смотрите вкладку «Динамика»` : 'Разобран отчёт: ' + shortDate(S.reports.find(r => r.id === view.rid)));
   } catch (e) { setMsg(e.message || 'Не получилось прочитать отчёт', true); }
 }
 // FatSecret не разрешает сайтам читать отчёт, если браузер шлёт заголовок priority (а браузеры шлют его всегда),
@@ -916,6 +1204,11 @@ document.addEventListener('click', e => {
   switch (b.dataset.act) {
     case 'tab': view.tab = b.dataset.tab; try { history.replaceState(null, '', '#' + view.tab); } catch (_) { } render(); window.scrollTo(0, 0); break;
     case 'rep': view.rid = b.dataset.id; render(); break;
+    case 'rep-open': view.rid = b.dataset.id; view.tab = 'report'; try { history.replaceState(null, '', '#report'); } catch (_) { } render(); window.scrollTo(0, 0); break;
+    case 'dyn-p': dyn.period = +b.dataset.v; dyn.sel = null; render(); break;
+    case 'dyn-s': dyn.scope = b.dataset.v; dyn.sel = null; render(); break;
+    case 'dyn-m': dyn.metric = b.dataset.v; render(); break;
+    case 'dsel': dyn.sel = dyn.sel === +b.dataset.i ? null : +b.dataset.i; render(); break;
     case 'rep-del': { pushUndo(); S.reports = S.reports.filter(r => r.id !== b.dataset.id); if (view.rid === b.dataset.id) view.rid = null; commit(); toast('Разбор удалён', true); break; }
     case 'padd': proteinForm(); break;
     case 'pdel': { const x = proteins().find(p => p.id === b.dataset.id); if (!x) break; pushUndo(); S.proteins = proteins().filter(p => p.id !== x.id); commit(); toast('Убрано: ' + x.n, true); break; }
@@ -950,7 +1243,7 @@ document.addEventListener('touchmove', e => { if (e.touches && e.touches.length 
 /* ---------- старт ---------- */
 loadLocal();
 const h0 = (location.hash || '').slice(1);
-if (['report', 'protein', 'goals'].includes(h0)) view.tab = h0;
+if (['report', 'dyn', 'protein', 'goals'].includes(h0)) view.tab = h0;
 render();
 initRemote();
 </script>
