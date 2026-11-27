@@ -330,6 +330,30 @@ body.sheet-open { overflow: hidden; }
 #toast button { color: var(--accent-soft); font-weight: 700; }
 
 [hidden] { display: none !important; }
+/* «Цели»: о себе и расчёт */
+.prof { display: grid; gap: 12px; }
+.acts { display: grid; gap: 4px; }
+.acts button { display: grid; text-align: left; padding: 8px 12px; border-radius: 12px; background: var(--surface-2); }
+.acts b { font-weight: 600; font-size: 14px; }
+.acts small { color: var(--muted); font-size: 12px; }
+.acts button[aria-pressed="true"] { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); }
+.acts button[aria-pressed="true"] b { color: var(--accent); }
+.pgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.seg3 { grid-template-columns: repeat(3, 1fr); } .seg4 { grid-template-columns: repeat(4, 1fr); }
+.segs.pace button { display: grid; gap: 0; padding: 6px 2px; }
+.segs.pace small { font-size: 11px; font-weight: 500; color: var(--muted); }
+.calc { display: grid; gap: 0; }
+.crow { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); }
+.crow:first-child { border-top: 0; padding-top: 0; }
+.crow span { display: grid; min-width: 0; }
+.crow small { color: var(--muted); font-size: 12px; }
+.crow b { white-space: nowrap; }
+.calc-st { margin: 8px 0 0; padding-top: 10px; border-top: 1px solid var(--line); font-size: 13px; color: var(--accent); font-weight: 600; }
+.calc .primary { margin-top: 10px; padding: 12px; border-radius: 14px; }
+.setup { display: grid; gap: 8px; margin-bottom: 12px; border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+.setup b { font-family: var(--f-display); font-size: 16px; }
+.setup p { margin: 0; color: var(--muted); font-size: 13.5px; }
+.setup .primary { padding: 11px; border-radius: 14px; }
 /* ---------- разбор отчёта ---------- */
 #app { padding-top: 6px; }
 .load { display: grid; gap: 10px; margin-bottom: 12px; }
@@ -489,12 +513,14 @@ body.sheet-open { overflow: hidden; }
 .warns ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 13.5px; }
 .warns .rule-hint { margin-top: 8px; }
 /* динамика: линии КБЖУ */
-.mlegend { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.mchip { display: grid; grid-template-columns: 10px minmax(0, 1fr); align-items: center; column-gap: 7px; min-width: 0; padding: 7px 10px; border-radius: 12px; background: var(--surface-2); font-size: 13.5px; font-weight: 600; text-align: left; }
-.mchip span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mchip small { grid-column: 2; color: var(--muted); font-size: 11.5px; font-weight: 500; white-space: nowrap; }
-.mchip[aria-pressed="false"] { background: transparent; box-shadow: inset 0 0 0 1px var(--line); color: var(--muted); }
-.mchip[aria-pressed="false"] .sw { opacity: .3; }
+.fchips { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.fchip { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 4px; border-radius: 12px; background: var(--surface-2); font-family: var(--f-display); font-weight: 800; font-size: 14px; }
+.fchip[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+.chart-h .sw { vertical-align: 0; }
+.lchart .ln.thick { stroke-width: 3; }
+.lchart .ln.ghost { stroke: var(--muted); opacity: .3; stroke-width: 1.5; }
+.chart .vlab { fill: var(--ink); font-size: 9.5px; font-weight: 600; font-family: var(--f-body); }
+.dsel-r.on span, .dsel-r.on b { font-weight: 700; }
 .lchart .ln { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .ln-k { stroke: var(--kcal); } .ln-p { stroke: var(--prot); } .ln-f { stroke: var(--fat); } .ln-c { stroke: var(--carb); }
 .lchart .pt { stroke: var(--surface); stroke-width: 1.5; }
@@ -536,22 +562,68 @@ body.sheet-open { overflow: hidden; }
 <script>
 'use strict';
 /* ---------- нормы ---------- */
+// нормы по умолчанию — пока человек не заполнил «О себе» (разбор идёт по ним с подсказкой)
 const DEFAULT_TARGETS = { k: 2400, p: [180, 190], f: [70, 90], c: [220, 250], fMin: 60 };
-// приёмы — как разделы FatSecret; сколько белка нужно на приём
+const r5 = v => Math.round(v / 5) * 5, fl5 = v => Math.floor(v / 5) * 5, ce5 = v => Math.ceil(v / 5) * 5;
+// белок по приёмам — доля дневной нормы (±5 г вокруг неё)
+const MEAL_P_SHARE = { 'Завтрак': 0.25, 'Обед': 0.28, 'Ужин': 0.28, 'Перекус/Другое': 0.19 };
+function mealProt(key) { const T = S.targets, mid = (T.p[0] + T.p[1]) / 2 * MEAL_P_SHARE[key], lo = Math.max(5, fl5(mid - 4)); return [lo, lo + 10]; }
+// приёмы — как разделы FatSecret
 const MEALS = [
-  { key: 'Завтрак', n: 'Завтрак', p: [40, 50], tip: 'сырники, творог, бутерброды с курицей или индейкой' },
-  { key: 'Обед', n: 'Обед', p: [45, 55], tip: 'курица, индейка или рыба 150–200 г' },
-  { key: 'Ужин', n: 'Ужин', p: [45, 55], tip: 'курица, индейка или рыба 150–200 г' },
-  { key: 'Перекус/Другое', n: 'Перекус', p: [30, 40], tip: 'кефир 500 мл, скир или творог' },
+  { key: 'Завтрак', n: 'Завтрак', get p() { return mealProt(this.key); } },
+  { key: 'Обед', n: 'Обед', get p() { return mealProt(this.key); } },
+  { key: 'Ужин', n: 'Ужин', get p() { return mealProt(this.key); } },
+  { key: 'Перекус/Другое', n: 'Перекус', get p() { return mealProt(this.key); } },
 ];
-const RULES = [
-  'Белок — главный приоритет: 180–190 г в день, 40–55 г в каждом основном приёме.',
-  'Жиры 70–90 г (не ниже 60). Чаще всего лишнее даёт масло «на глаз», жареное, сыр, орехи и сладкое с жиром.',
-  'Масло — 1 ч. л. (5 г) на салат или сковороду.',
-  'Сладкое к чаю — без жира: зефир, пастила, мармелад, безе, пряник.',
-  'Смотрите на среднее за неделю: один день с перебором — не страшно.',
-  'Плато 2–3 недели (вес и талия стоят) → минус 100–150 ккал.',
+function rules() {
+  const T = S.targets, main = MEALS.slice(0, 3).map(m => m.p);
+  return [
+    `Белок — главный приоритет: ${T.p[0]}–${T.p[1]} г в день, ${Math.min(...main.map(p => p[0]))}–${Math.max(...main.map(p => p[1]))} г в каждом основном приёме.`,
+    `Жиры ${T.f[0]}–${T.f[1]} г (не ниже ${T.fMin}). Чаще всего лишнее даёт масло «на глаз», жареное, сыр, орехи и сладкое с жиром.`,
+    'Масло — 1 ч. л. (5 г) на салат или сковороду.',
+    'Сладкое к чаю — без жира: зефир, пастила, мармелад, безе, пряник.',
+    'Смотрите на среднее за неделю: один день с перебором — не страшно.',
+    'Вес и талия стоят 2–3 недели → минус 100–150 ккал.',
+  ];
+}
+
+/* ---------- расчёт норм по формуле ---------- */
+const ACTS = [
+  [1.2, 'Почти без движения', 'сидячая работа, без тренировок'],
+  [1.375, 'Немного', '1–3 тренировки в неделю или много ходьбы'],
+  [1.55, 'Средне', '3–5 тренировок в неделю'],
+  [1.725, 'Много', '6–7 тренировок в неделю'],
+  [1.9, 'Очень много', 'физическая работа и тренировки'],
 ];
+const GOALS = [['loss', 'Сбросить'], ['keep', 'Держать'], ['gain', 'Набрать']];
+const PACES = { loss: [10, 15, 20, 25], gain: [5, 10, 15] };
+const PACE_N = { loss: { 10: 'мягко', 15: 'умеренно', 20: 'быстрее', 25: 'жёстко' }, gain: { 5: 'медленно', 10: 'умеренно', 15: 'быстрее' } };
+const defPace = goal => goal === 'gain' ? 10 : 15;
+function profileOk(pr) { return !!(pr && (pr.sex === 'm' || pr.sex === 'f') && pr.age >= 14 && pr.age <= 90 && pr.height >= 120 && pr.height <= 230 && pr.weight >= 35 && pr.weight <= 250); }
+// Миффлин — Сан Жеор × активность ± темп; белок и жиры — на кг веса, углеводы — остаток калорий
+function calcTargets(pr) {
+  const bmr = 10 * pr.weight + 6.25 * pr.height - 5 * pr.age + (pr.sex === 'f' ? -161 : 5);
+  const act = +pr.act || 1.375, tdee = bmr * act;
+  const goal = pr.goal || 'loss', pace = goal === 'keep' ? 0 : (+pr.pace || defPace(goal));
+  const kRaw = tdee * (1 + (goal === 'gain' ? pace : -pace) / 100);
+  const floorK = pr.sex === 'f' ? 1200 : 1500;
+  const k = Math.max(floorK, Math.round(kRaw / 50) * 50);
+  // при сильном лишнем весе белок и жиры считаем от «поправленного» веса, а не от полного
+  const h = pr.height / 100, bmi = pr.weight / (h * h), w25 = 25 * h * h;
+  const refW = bmi > 30 ? w25 + 0.4 * (pr.weight - w25) : pr.weight;
+  const pk = goal === 'keep' ? 1.6 : 1.8, p0 = Math.max(40, fl5(pk * refW - 5));
+  const f = [fl5(0.7 * refW), ce5(0.85 * refW)], fMin = r5(0.6 * refW);
+  const cMid = Math.max(60, (k - (p0 + 5) * 4 - (f[0] + f[1]) / 2 * 9) / 4);
+  const c = [r5(cMid - 15), r5(cMid + 15)];
+  return { k, p: [p0, p0 + 10], f, c, fMin, x: { bmr, act, tdee, goal, pace, pk, refW, bmi, weekly: (k - tdee) * 7 / 7700, floorHit: k === floorK && kRaw < floorK } };
+}
+// нормы из формулы, если включён расчёт и «О себе» заполнено
+function applyAuto() {
+  if (!S.auto || !profileOk(S.profile)) return;
+  const C = calcTargets(S.profile);
+  S.targets = { k: C.k, p: C.p, f: C.f, c: C.c, fMin: C.fMin };
+}
+const needSetup = () => S.auto && !profileOk(S.profile);
 
 /* ---------- памятка: продукты с высоким белком (на 100 г) ---------- */
 const KINDS = [['meat', 'Мясо и птица'], ['fish', 'Рыба и морепродукты'], ['dairy', 'Молочное'], ['eggs', 'Яйца'], ['plant', 'Бобовые'], ['other', 'Другое']];
@@ -590,17 +662,17 @@ let S = blankState();
 let view = { tab: 'report', rid: null };
 let undoStack = [];
 let sync = 'local';
-function blankState() { return { v: 2, updatedAt: 0, targets: { ...DEFAULT_TARGETS }, proteins: null, reports: [] }; }
+function blankState() { return { v: 2, updatedAt: 0, targets: { ...DEFAULT_TARGETS }, profile: null, auto: true, proteins: null, reports: [] }; }
 function normalize(x) {
   const s = blankState();
   if (!x || typeof x !== 'object') return s;
   const c = JSON.parse(JSON.stringify(x));
-  return { ...s, ...c, targets: { ...DEFAULT_TARGETS, ...(c.targets || {}) }, reports: Array.isArray(c.reports) ? c.reports : [], proteins: Array.isArray(c.proteins) ? c.proteins : null };
+  return { ...s, ...c, targets: { ...DEFAULT_TARGETS, ...(c.targets || {}) }, profile: c.profile && typeof c.profile === 'object' ? c.profile : null, auto: typeof c.auto === 'boolean' ? c.auto : !c.targets, reports: Array.isArray(c.reports) ? c.reports : [], proteins: Array.isArray(c.proteins) ? c.proteins : null };
 }
 function loadLocal() { try { const raw = localStorage.getItem(LS_KEY); if (raw) S = normalize(JSON.parse(raw)); } catch (e) { } }
 function saveLocal() { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) { } }
 function proteins() { return S.proteins || PROTEIN_DEFAULT; }
-function commit() { S.updatedAt = Date.now(); saveLocal(); scheduleRemote(); render(); }
+function commit() { applyAuto(); S.updatedAt = Date.now(); saveLocal(); scheduleRemote(); render(); }
 function pushUndo() { undoStack.push(JSON.stringify(S)); if (undoStack.length > 20) undoStack.shift(); }
 function undo() { const prev = undoStack.pop(); if (!prev) return; S = normalize(JSON.parse(prev)); commit(); hideToast(); }
 
@@ -709,7 +781,7 @@ async function parseReport(buf) {
     if (!has && name && last && !last.portion) last.portion = name;
   }
   const out = days.filter(d => d.meals.some(m => m.items.length));
-  if (!out.length) throw new Error('Не нашёл в файле приёмов пищи — это точно отчёт «Food Diary Report» из FatSecret?');
+  if (!out.length) throw new Error('Не нашёл в файле приёмов пищи. Нужен отчёт «Дневник питания» из FatSecret на русском языке');
   for (const d of out) {
     for (const m of d.meals) if (!m.total && m.items.length) m.total = sumItems(m.items);
     if (!d.total) d.total = d.meals.reduce((a, m) => (m.total ? addT(a, m.total) : a), zeroT());
@@ -1015,6 +1087,7 @@ const IC = {
   chev: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
 };
 function render() {
+  applyAuto();
   if (view.tab === 'report') $app.innerHTML = renderReport();
   else if (view.tab === 'dyn') $app.innerHTML = renderDynamics();
   else if (view.tab === 'protein') $app.innerHTML = renderProtein();
@@ -1054,6 +1127,7 @@ function renderReport() {
       <div class="load-row"><button class="primary" type="submit">Разобрать</button><label class="ghost filebtn">Выбрать PDF<input id="pdf" type="file" accept="application/pdf,.pdf"></label></div>
       <p class="rule-hint" id="lmsg">Вставьте ссылку на отчёт или выберите сохранённый PDF. Недельный отчёт разложится по дням.</p>
     </form>`;
+  if (needSetup()) h += `<div class="card setup"><b>Сначала — ваши нормы</b><p>Укажите пол, возраст, рост и вес во вкладке «Цели» — посчитаю калории и БЖУ. Пока разбор идёт по примерным нормам: ${f0(S.targets.k)} ккал, белок ${S.targets.p[0]}–${S.targets.p[1]} г.</p><button class="primary" data-act="tab" data-tab="goals">Заполнить</button></div>`;
   if (reps.length) h += `<div class="gchips reps">${reps.map(r => `<span class="chip rep ${r === R ? 'on' : ''}"><button data-act="rep" data-id="${r.id}">${esc(shortDate(r))}</button><button class="rx" data-act="rep-del" data-id="${r.id}" aria-label="Удалить разбор">×</button></span>`).join('')}</div>`;
   if (!R) return h + `<div class="card empty-state"><b>Здесь будет разбор дня</b><p>Итог против норм с отклонениями, почему не хватило белка или много жира, таблица по приёмам, что поправить — и что съесть до конца дня, если приём ещё не внесён.</p></div>`;
   const A = analyze(R), T = S.targets, t = A.t, Rg = ranges();
@@ -1113,7 +1187,7 @@ function shortDate(r) {
 /* ---------- динамика: дни и недели, весь день или один приём ---------- */
 // показатели графика: ключ, имя, единица, подпись у конца линии (КБЖУ)
 const MET = [['k', 'Калории', 'ккал', 'К'], ['p', 'Белок', 'г', 'Б'], ['f', 'Жиры', 'г', 'Ж'], ['c', 'Углеводы', 'г', 'У']];
-let dyn = { period: 7, scope: '', hide: [], sel: null };
+let dyn = { period: 7, scope: '', focus: (() => { try { const v = localStorage.getItem('racion:focus'); return v == null ? 'p' : v; } catch (_) { return 'p'; } })(), sel: null };
 const keyDate = k => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); };
 const dayDiff = (a, b) => Math.round((keyDate(a) - keyDate(b)) / 864e5);
 function mondayKey(k) { const d = keyDate(k), wd = (d.getDay() + 6) % 7; d.setDate(d.getDate() - wd); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
@@ -1133,11 +1207,7 @@ const MAIN_MEALS = ['Завтрак', 'Обед', 'Ужин'];
 const missing = r => MAIN_MEALS.filter(k => { const m = r.meals.find(x => x.name === k); return !(m && m.items.length); });
 const partialDay = r => !dyn.scope && missing(r).length > 0;
 const midOf = (Rg, mk) => (Rg[mk][0] + Rg[mk][1]) / 2;
-function toggleMetric(mk) {
-  const h = new Set(dyn.hide);
-  if (h.has(mk)) h.delete(mk); else if (MET.length - h.size > 1) h.add(mk); // последнюю линию не прячем
-  dyn.hide = [...h];
-}
+function setFocus(mk) { dyn.focus = mk; try { localStorage.setItem('racion:focus', mk); } catch (_) { } }
 const RING_LEGEND = `<div class="lv-legend rings"><span><i class="lv-u2"></i>сильный недобор</span><span><i class="lv-u1"></i>недобор</span><span><i class="lv-o1"></i>перебор</span><span><i class="lv-o2"></i>сильный перебор</span></div>`;
 function renderDynamics() {
   const all = [...S.reports].filter(r => r.key).sort((a, b) => a.key.localeCompare(b.key));
@@ -1153,11 +1223,11 @@ function renderDynamics() {
       <div class="gchips">${chip('dyn-s', '', dyn.scope, 'Весь день')}${MEALS.map(m => chip('dyn-s', m.key, dyn.scope, m.n)).join('')}</div>
     </div>
     <div class="card chart-card">
-      <div class="chart-h"><b>КБЖУ по дням${scopeN}</b><span>в % от нормы</span></div>
-      <div class="mlegend">${MET.map(([mk, n]) => `<button class="mchip" data-act="dyn-t" data-v="${mk}" aria-pressed="${!dyn.hide.includes(mk)}"><i class="sw m-${mk}"></i><span>${n}</span><small class="num">${Rg[mk][0]}–${Rg[mk][1]}</small></button>`).join('')}</div>
+      <div class="fchips">${[['', 'Все'], ...MET.map(m => [m[0], m[3]])].map(([mk, lab]) => `<button class="fchip" data-act="dyn-f" data-v="${mk}" aria-pressed="${(dyn.focus || '') === mk}" aria-label="${mk ? MET.find(m => m[0] === mk)[1] : 'Все показатели'}">${mk ? `<i class="sw m-${mk}"></i>` : ''}${lab}</button>`).join('')}</div>
+      <div class="chart-h">${dyn.focus ? (([mk, n, u]) => `<b><i class="sw m-${mk}"></i> ${n}${scopeN}</b><span class="num">норма ${f0(Rg[mk][0])}–${f0(Rg[mk][1])} ${u}</span>`)(MET.find(m => m[0] === dyn.focus)) : `<b>КБЖУ по дням${scopeN}</b><span>в % от нормы</span>`}</div>
       ${lineSVG(days, Rg)}
       <div id="dinfo">${dyn.sel != null && days[dyn.sel] ? selInfo(days[dyn.sel], Rg) : '<p class="chart-info">Нажмите на день — покажу все показатели.</p>'}</div>
-      <p class="rule-hint chart-note">100% — цель, цветные отрезки справа — нормы. Нажмите на показатель, чтобы скрыть линию.${days.some(partialDay) ? ' * — день внесён не полностью, без оценки.' : ''} Кольцо — вне нормы:</p>
+      <p class="rule-hint chart-note">${dyn.focus ? 'Яркая линия — выбранный показатель, полоса — его норма, бледные — остальные для сравнения.' : 'Цветные отрезки справа — нормы показателей.'} 100% — цель.${days.some(partialDay) ? ' * — день внесён не полностью, без оценки.' : ''} Кольцо — вне нормы:</p>
       ${RING_LEGEND}
     </div>`;
   // таблица дней + среднее за период
@@ -1200,20 +1270,22 @@ function selInfo(r, Rg) {
   const v = dayVals(r, dyn.scope);
   if (!v) return `<p class="chart-info">${esc(shortDate(r))}: не внесено.</p>`;
   return `<div class="dsel"><div class="dsel-h"><b>${esc(shortDate(r))}${partialDay(r) ? ` <small>не внесено: ${missing(r).join(', ').toLowerCase()}</small>` : ''}</b><button class="linkbtn" data-act="rep-open" data-id="${r.id}">Разбор дня</button></div>
-    ${MET.map(([mk, n, u]) => { const L = metLvl(mk, v[mk], Rg, dyn.scope); return `<div class="dsel-r"><i class="sw m-${mk}"></i><span>${n}</span><b class="num">${f0(v[mk])} ${u}</b><span class="stp lv-${L.cls} num">${lvlText(L, u)}</span></div>`; }).join('')}</div>`;
+    ${[...MET].sort((a, b) => (b[0] === dyn.focus) - (a[0] === dyn.focus)).map(([mk, n, u]) => { const L = metLvl(mk, v[mk], Rg, dyn.scope); return `<div class="dsel-r${mk === dyn.focus ? ' on' : ''}"><i class="sw m-${mk}"></i><span>${n}</span><b class="num">${f0(v[mk])} ${u}</b><span class="stp lv-${L.cls} num">${lvlText(L, u)}</span></div>`; }).join('')}</div>`;
 }
 // линии всех показателей на одной шкале: % от середины нормы (100% — цель), без второй оси.
-// Норма каждого — цветной отрезок справа; одна видимая линия — полоса нормы во всю ширину.
+// Фокус: выбранный показатель — яркой толстой линией с полосой своей нормы и подписями дней вне нормы,
+// остальные — бледным фоном для сравнения. «Все» — все линии в цвете, нормы — отрезками справа.
 // Точка вне нормы — в кольце цвета уровня (недобор — красные, перебор — жёлтый/оранжевый).
 function lineSVG(days, Rg) {
-  const W = 310, H = 224, L = 36, Rp = 50, Tp = 10, B = 30, pw = W - L - Rp, ph = H - Tp - B;
+  const f = dyn.focus || null;
+  const W = 310, H = 224, L = 36, Rp = f ? 26 : 50, Tp = 14, B = 30, pw = W - L - Rp, ph = H - Tp - B;
   const n = days.length, slot = pw / n, X = i => L + slot * i + slot / 2;
-  const vis = MET.filter(m => !dyn.hide.includes(m[0]));
+  const bright = f ? MET.filter(m => m[0] === f) : MET;
   const vals = days.map(r => dayVals(r, dyn.scope));
   const P = (mk, v) => v / midOf(Rg, mk) * 100;
   let lo = 80, hi = 120;
-  for (const [mk] of vis) {
-    lo = Math.min(lo, P(mk, Rg[mk][0])); hi = Math.max(hi, P(mk, Rg[mk][1]));
+  for (const [mk] of MET) {
+    if (!f || mk === f) { lo = Math.min(lo, P(mk, Rg[mk][0])); hi = Math.max(hi, P(mk, Rg[mk][1])); }
     for (const v of vals) if (v && v[mk] != null) { const p = P(mk, v[mk]); lo = Math.min(lo, p); hi = Math.max(hi, p); }
   }
   const span = hi - lo, step = span <= 60 ? 10 : span <= 120 ? 20 : span <= 220 ? 25 : 50;
@@ -1221,37 +1293,41 @@ function lineSVG(days, Rg) {
   const Y = p => Tp + ph - (p - y0) / (y1 - y0) * ph;
   const r1 = v => Math.round(v * 10) / 10;
   let s = `<svg class="chart lchart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Калории, белок, жиры и углеводы по дням, в процентах от нормы">`;
-  if (vis.length === 1) { const mk = vis[0][0], a = Y(P(mk, Rg[mk][1])), b = Y(P(mk, Rg[mk][0])); s += `<rect class="bd bd-${mk}" x="${L}" width="${pw}" y="${r1(a)}" height="${r1(Math.max(2, b - a))}"/>`; }
+  if (f) { const a = Y(P(f, Rg[f][1])), b = Y(P(f, Rg[f][0])); s += `<rect class="bd bd-${f}" x="${L}" width="${pw}" y="${r1(a)}" height="${r1(Math.max(2, b - a))}"/>`; }
   for (let v = y0; v <= y1 + 0.001; v += step) s += `<line class="grid${v === 100 ? ' ref' : ''}" x1="${L}" x2="${L + pw}" y1="${r1(Y(v))}" y2="${r1(Y(v))}"/><text class="ax${v === 100 ? ' refl' : ''}" x="${L - 5}" y="${r1(Y(v) + 3.5)}" text-anchor="end">${v}%</text>`;
-  // нормы справа
-  vis.forEach(([mk], j) => { const x = L + pw + 6 + j * 5; s += `<line class="br br-${mk}" x1="${x}" x2="${x}" y1="${r1(Y(P(mk, Rg[mk][1])))}" y2="${r1(Y(P(mk, Rg[mk][0])))}"/>`; });
+  // нормы справа — когда в цвете все линии
+  if (!f) MET.forEach(([mk], j) => { const x = L + pw + 6 + j * 5; s += `<line class="br br-${mk}" x1="${x}" x2="${x}" y1="${r1(Y(P(mk, Rg[mk][1])))}" y2="${r1(Y(P(mk, Rg[mk][0])))}"/>`; });
   if (dyn.sel != null && dyn.sel < n) s += `<line class="cross" x1="${r1(X(dyn.sel))}" x2="${r1(X(dyn.sel))}" y1="${Tp}" y2="${Tp + ph}"/>`;
   // подписи дней
   days.forEach((r, i) => {
     const d = keyDate(r.key), lab = d.getDate(), wd = d.toLocaleDateString('ru-RU', { weekday: 'short' });
     if (n <= 16 || i % Math.ceil(n / 12) === 0) s += `<text class="ax${dyn.sel === i ? ' refl' : ''}" x="${r1(X(i))}" y="${H - 16}" text-anchor="middle">${lab}${partialDay(r) ? '*' : ''}</text>` + (n <= 10 ? `<text class="ax wd" x="${r1(X(i))}" y="${H - 5}" text-anchor="middle">${wd}</text>` : '');
   });
-  // линии (разрыв там, где приём не внесён)
-  for (const [mk] of vis) {
+  // линии (разрыв там, где приём не внесён): сначала бледные, сверху — яркая
+  const order = f ? [...MET.filter(m => m[0] !== f), ...bright] : MET;
+  for (const [mk] of order) {
     let d = '', pen = false;
     vals.forEach((v, i) => { if (!v || v[mk] == null) { pen = false; return; } d += (pen ? 'L' : 'M') + r1(X(i)) + ',' + r1(Y(P(mk, v[mk]))); pen = true; });
-    if (d) s += `<path class="ln ln-${mk}" d="${d}"/>`;
+    if (d) s += `<path class="ln ${f && mk !== f ? 'ghost' : 'ln-' + mk + (f ? ' thick' : '')}" d="${d}"/>`;
   }
-  // точки и кольца уровня
+  // точки, кольца уровня и (в фокусе) значения дней вне нормы
   const big = n <= 14;
-  for (const [mk] of vis) vals.forEach((v, i) => {
+  for (const [mk] of bright) vals.forEach((v, i) => {
     if (!v || v[mk] == null) return;
     const cx = r1(X(i)), cy = r1(Y(P(mk, v[mk]))), Lv = metLvl(mk, v[mk], Rg, dyn.scope), sel = dyn.sel === i, part = partialDay(days[i]);
     if (part) { s += `<circle class="pt hollow ln-${mk}" cx="${cx}" cy="${cy}" r="${sel ? 4.5 : big ? 3.5 : 2.4}"/>`; return; }
-    if (Lv.cls !== 'ok' && Lv.cls !== 'na') s += `<circle class="ring lv-${Lv.cls}" cx="${cx}" cy="${cy}" r="${big || sel ? 6.5 : 4.5}"/>`;
+    if (Lv.cls !== 'ok' && Lv.cls !== 'na') {
+      s += `<circle class="ring lv-${Lv.cls}" cx="${cx}" cy="${cy}" r="${big || sel ? 6.5 : 4.5}"/>`;
+      if (f && (big || sel)) s += `<text class="vlab" x="${cx}" y="${r1(Lv.cls[0] === 'u' ? cy + 17 : cy - 10)}" text-anchor="middle">${f0(v[mk])}</text>`;
+    }
     s += `<circle class="pt pt-${mk}" cx="${cx}" cy="${cy}" r="${sel ? 4.5 : big ? 3.5 : 2.4}"/>`;
   });
-  // подписи у конца линий — разведены по высоте
-  const ends = vis.map(([mk, , , short]) => { for (let i = n - 1; i >= 0; i--) if (vals[i] && vals[i][mk] != null) return { mk, short, y: Y(P(mk, vals[i][mk])) }; return null; }).filter(Boolean).sort((a, b) => a.y - b.y);
+  // подписи у конца ярких линий — разведены по высоте
+  const ends = bright.map(([mk, , , short]) => { for (let i = n - 1; i >= 0; i--) if (vals[i] && vals[i][mk] != null) return { mk, short, y: Y(P(mk, vals[i][mk])) }; return null; }).filter(Boolean).sort((a, b) => a.y - b.y);
   for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 12) ends[i].y = ends[i - 1].y + 12;
   for (let i = ends.length - 1; i >= 0; i--) ends[i].y = Math.min(ends[i].y, i === ends.length - 1 ? Tp + ph : ends[i + 1].y - 12);
   for (let i = 0; i < ends.length; i++) ends[i].y = Math.max(ends[i].y, i === 0 ? Tp + 4 : ends[i - 1].y + 12);
-  const lx = L + pw + 6 + vis.length * 5 + 3;
+  const lx = f ? L + pw + 4 : L + pw + 6 + MET.length * 5 + 3;
   for (const e of ends) s += `<circle class="pt pt-${e.mk}" cx="${r1(lx + 3)}" cy="${r1(e.y)}" r="3"/><text class="elab" x="${r1(lx + 9)}" y="${r1(e.y + 3.5)}">${e.short}</text>`;
   // зоны касания — шире точки, на весь день
   days.forEach((r, i) => { s += `<rect class="hit" data-act="dsel" data-i="${i}" x="${r1(L + i * slot)}" y="0" width="${r1(slot)}" height="${H}"/>`; });
@@ -1301,22 +1377,54 @@ function proteinForm() {
 }
 
 function renderGoals() {
-  const T = S.targets;
-  return `<h1 class="page-h">Цели на день</h1><p class="page-sub">Поддержание ~2950–3000 ккал, цель — снижать жир и сохранить мышцы.</p>
+  const T = S.targets, pr = S.profile || {}, ok = profileOk(S.profile), C = ok ? calcTargets(S.profile) : null, x = C && C.x;
+  const goal = pr.goal || 'loss', pace = pr.pace || defPace(goal), act = +pr.act || 1.375;
+  const seg = (key, val, cur, label) => `<button type="button" data-act="prof" data-k="${key}" data-v="${val}" aria-selected="${String(cur) === String(val)}">${label}</button>`;
+  const GOAL_TXT = { loss: 'цель — снижать вес', keep: 'цель — держать вес', gain: 'цель — набирать массу' };
+  let h = `<h1 class="page-h">Цели на день</h1>
+    <p class="page-sub">${ok ? `Поддержание веса ≈ ${f0(x.tdee)} ккал, ${GOAL_TXT[x.goal]}.` : 'Укажите пол, возраст, рост и вес — посчитаю калории и БЖУ по формуле.'}</p>
   <div class="stack">
+    <div class="sec-h">О себе</div>
+    <div class="card prof">
+      <div class="segs">${seg('sex', 'm', pr.sex, 'Мужчина')}${seg('sex', 'f', pr.sex, 'Женщина')}</div>
+      <div class="pgrid">
+        <label class="fld"><span>Возраст, лет</span><input id="pf-age" data-pkey="age" inputmode="numeric" autocomplete="off" value="${pr.age || ''}" placeholder="—"></label>
+        <label class="fld"><span>Рост, см</span><input id="pf-height" data-pkey="height" inputmode="numeric" autocomplete="off" value="${pr.height || ''}" placeholder="—"></label>
+        <label class="fld"><span>Вес, кг</span><input id="pf-weight" data-pkey="weight" inputmode="decimal" autocomplete="off" value="${pr.weight ? String(pr.weight).replace('.', ',') : ''}" placeholder="—"></label>
+      </div>
+      <div class="fld"><span>Активность</span><div class="acts">${ACTS.map(([v, n, d]) => `<button type="button" data-act="prof" data-k="act" data-v="${v}" aria-pressed="${act === v}"><b>${n}</b><small>${d}</small></button>`).join('')}</div></div>
+      <div class="fld"><span>Цель</span><div class="segs seg3">${GOALS.map(([v, n]) => seg('goal', v, goal, n)).join('')}</div></div>
+      ${goal !== 'keep' ? `<div class="fld"><span>Темп — ${goal === 'loss' ? 'дефицит' : 'прибавка'} калорий</span><div class="segs seg${PACES[goal].length} pace">${PACES[goal].map(v => seg('pace', v, pace, `${goal === 'loss' ? '−' : '+'}${v}%<small>${PACE_N[goal][v]}</small>`)).join('')}</div></div>` : ''}
+      ${!ok && (pr.age || pr.height || pr.weight || pr.sex) ? `<p class="rule-hint">Для расчёта нужны пол, возраст (14–90), рост (120–230 см) и вес (35–250 кг).</p>` : ''}
+    </div>`;
+  if (ok) {
+    const dec = v => String(v).replace('.', ',');
+    h += `<div class="sec-h">Как посчитано</div><div class="card calc">
+      <div class="crow"><span>Тратите в покое<small>формула Миффлина — Сан Жеора</small></span><b class="num">${f0(x.bmr)} ккал</b></div>
+      <div class="crow"><span>× активность ${dec(x.act)}<small>столько нужно, чтобы держать вес</small></span><b class="num">${f0(x.tdee)} ккал</b></div>
+      ${x.goal !== 'keep' ? `<div class="crow"><span>${x.goal === 'loss' ? '−' : '+'}${x.pace}% — ${x.goal === 'loss' ? 'дефицит' : 'прибавка'}<small>${x.floorHit ? `ниже ${f0(C.k)} ккал не опускаем — темп будет меньше` : `≈ ${x.weekly > 0 ? '+' : '−'}${f1(Math.abs(x.weekly))} кг в неделю`}</small></span><b class="num">${f0(C.k)} ккал</b></div>` : ''}
+      <div class="crow"><span>Белок<small>${dec(x.pk)} г на кг × ${f0(x.refW)} кг${x.bmi > 30 ? ' (вес с поправкой на лишний жир)' : ''}</small></span><b class="num">${C.p[0]}–${C.p[1]} г</b></div>
+      <div class="crow"><span>Жиры<small>0,7–0,85 г на кг, не ниже ${C.fMin} г</small></span><b class="num">${C.f[0]}–${C.f[1]} г</b></div>
+      <div class="crow"><span>Углеводы<small>остаток калорий</small></span><b class="num">${C.c[0]}–${C.c[1]} г</b></div>
+      ${S.auto ? `<p class="calc-st">Нормы ниже считаются по этой формуле и меняются вместе с весом.</p>` : `<button class="primary" data-act="auto-on">Взять эти нормы</button><p class="rule-hint">Сейчас нормы ниже заданы вручную.</p>`}
+    </div>`;
+  }
+  h += `<div class="sec-h">Нормы на день</div>
     <div class="card">
-      <div class="goal"><label>Калории<small>Плато 2–3 недели → −100…150</small></label>
+      <div class="goal"><label>Калории<small>Вес стоит 2–3 недели → −100…150</small></label>
         <div class="stepper"><button class="sbtn" data-act="kcal" data-d="-50" aria-label="Минус 50 ккал">−</button><span class="v num">${f0(T.k)}</span><button class="sbtn" data-act="kcal" data-d="50" aria-label="Плюс 50 ккал">+</button></div></div>
       ${rangeRow('p', 'Белок, г', 'Главный приоритет', T.p)}
       ${rangeRow('f', 'Жиры, г', 'Не ниже ' + T.fMin + ' г', T.f)}
       ${rangeRow('c', 'Углеводы, г', 'Остаток калорий', T.c)}
+      ${S.auto && ok ? `<p class="rule-hint">Поменяете число здесь — расчёт по формуле выключится.</p>` : ''}
     </div>
     <div class="sec-h">Белок по приёмам</div>
     <div class="card"><ul class="meal-p">${MEALS.map(m => `<li><span>${m.n}</span><b class="num">${m.p[0]}–${m.p[1]} г</b></li>`).join('')}</ul></div>
     <div class="sec-h">Правила</div>
-    <div class="card"><ol class="rules">${RULES.map(r => `<li>${r}</li>`).join('')}</ol></div>
-    <div class="storage ${sync === 'cloud' ? 'on' : ''}"><i></i>${sync === 'cloud' ? 'Сохраняется в вашем аккаунте Claude' : sync === 'error' ? 'Не удалось сохранить в облако, данные пока на этом устройстве' : 'Данные хранятся только в этом браузере'}${window.APP_VERSION ? ' · версия ' + window.APP_VERSION : ''}</div>
+    <div class="card"><ol class="rules">${rules().map(r => `<li>${r}</li>`).join('')}</ol></div>
+    <div class="storage ${sync === 'cloud' ? 'on' : ''}"><i></i>${sync === 'cloud' ? 'Сохраняется в вашем аккаунте Claude' : sync === 'error' ? 'Не удалось сохранить в облако, данные пока на этом устройстве' : 'Данные хранятся только на этом телефоне, в этом браузере'}${window.APP_VERSION ? ' · версия ' + window.APP_VERSION : ''}</div>
   </div>`;
+  return h;
 }
 function rangeRow(key, name, sub, [lo, hi]) {
   return `<div class="goal"><label for="t-${key}-lo">${name}<small>${sub}</small></label>
@@ -1324,6 +1432,8 @@ function rangeRow(key, name, sub, [lo, hi]) {
 }
 
 /* ---------- загрузка отчёта ---------- */
+// правка норм руками выключает расчёт по формуле (вернуть — «Взять эти нормы» или «Отменить»)
+function manualEdit() { if (!S.auto) return; pushUndo(); S.auto = false; setTimeout(() => toast('Нормы заданы вручную — формула их больше не меняет', true), 0); }
 function setMsg(text, bad) { const m = document.getElementById('lmsg'); if (m) { m.textContent = text; m.classList.toggle('bad', !!bad); } }
 async function loadBuffer(buf) {
   setMsg('Читаю отчёт…');
@@ -1344,6 +1454,7 @@ async function loadBuffer(buf) {
 const PROXY = 'https://racion-proxy.speertraeger17.workers.dev/';
 async function loadLink(url) {
   if (!/^https:\/\/[a-z0-9.-]*fatsecret\.[a-z.]+\/export\//i.test(url)) { setMsg('Нужна ссылка на отчёт FatSecret — она начинается с https://foods.fatsecret.com/export/…', true); return; }
+  try { const u = new URL(url); u.searchParams.set('lang', 'ru'); url = u.toString(); } catch (_) { }
   setMsg('Скачиваю отчёт…');
   let buf;
   try {
@@ -1390,13 +1501,15 @@ document.addEventListener('click', e => {
     case 'rep-open': view.rid = b.dataset.id; view.tab = 'report'; try { history.replaceState(null, '', '#report'); } catch (_) { } render(); window.scrollTo(0, 0); break;
     case 'dyn-p': dyn.period = +b.dataset.v; dyn.sel = null; render(); break;
     case 'dyn-s': dyn.scope = b.dataset.v; dyn.sel = null; render(); break;
-    case 'dyn-t': toggleMetric(b.dataset.v); render(); break;
+    case 'dyn-f': setFocus(b.dataset.v); render(); break;
     case 'dsel': dyn.sel = dyn.sel === +b.dataset.i ? null : +b.dataset.i; render(); break;
     case 'rep-del': { pushUndo(); S.reports = S.reports.filter(r => r.id !== b.dataset.id); if (view.rid === b.dataset.id) view.rid = null; commit(); toast('Разбор удалён', true); break; }
     case 'padd': proteinForm(); break;
     case 'pdel': { const x = proteins().find(p => p.id === b.dataset.id); if (!x) break; pushUndo(); S.proteins = proteins().filter(p => p.id !== x.id); commit(); toast('Убрано: ' + x.n, true); break; }
     case 'preset': pushUndo(); S.proteins = null; commit(); toast('Стандартный список возвращён', true); break;
-    case 'kcal': S.targets.k = Math.max(1200, S.targets.k + +b.dataset.d); commit(); break;
+    case 'kcal': manualEdit(); S.targets.k = Math.max(1200, S.targets.k + +b.dataset.d); commit(); break;
+    case 'prof': { const k = b.dataset.k, v = k === 'pace' || k === 'act' ? +b.dataset.v : b.dataset.v; S.profile = { ...(S.profile || {}), [k]: v }; if (k === 'goal') S.profile.pace = defPace(v); commit(); break; }
+    case 'auto-on': pushUndo(); S.auto = true; commit(); toast('Нормы посчитаны по формуле', true); break;
     case 'close': closeSheet(); break;
     case 'undo': undo(); break;
   }
@@ -1411,9 +1524,15 @@ document.addEventListener('submit', e => {
 document.addEventListener('change', e => {
   const t = e.target;
   if (t.id === 'pdf' && t.files && t.files[0]) { const f = t.files[0]; f.arrayBuffer().then(buf => loadBuffer(buf)).catch(() => setMsg('Не удалось открыть файл', true)); return; }
+  if (t.dataset && t.dataset.pkey) {
+    const v = parseFloat(String(t.value).replace(',', '.').replace(/[^0-9.]/g, ''));
+    S.profile = { ...(S.profile || {}), [t.dataset.pkey]: isFinite(v) ? (t.dataset.pkey === 'weight' ? Math.round(v * 10) / 10 : t.dataset.pkey === 'act' ? v : Math.round(v)) : null };
+    commit(); return;
+  }
   if (t.dataset && t.dataset.tkey) {
     const v = parseInt(t.value, 10), key = t.dataset.tkey, i = +t.dataset.ti;
     if (!isFinite(v) || v < 0) { render(); return; }
+    manualEdit();
     const r = S.targets[key].slice(); r[i] = v; if (r[0] > r[1]) r.reverse();
     S.targets[key] = r; commit();
   }
