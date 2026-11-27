@@ -692,6 +692,17 @@ function loadLocal() { try { const raw = localStorage.getItem(LS_KEY); if (raw) 
 function saveLocal() { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) { } }
 function proteins() { return S.proteins || PROTEIN_DEFAULT; }
 function commit() { applyAuto(); S.updatedAt = Date.now(); saveLocal(); scheduleRemote(); render(); }
+// сохранить без перерисовки — страница обновится, когда закончите ввод (фокус уйдёт с полей)
+let lazyRender = false;
+function commitQuiet() { applyAuto(); S.updatedAt = Date.now(); saveLocal(); scheduleRemote(); lazyRender = true; }
+document.addEventListener('focusout', () => {
+  if (!lazyRender) return;
+  setTimeout(() => {
+    const a = document.activeElement;
+    if (!lazyRender || (a && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName) && $app.contains(a))) return; // перешли в соседнее поле — ждём
+    render();
+  }, 250);
+});
 function pushUndo() { undoStack.push(JSON.stringify(S)); if (undoStack.length > 20) undoStack.shift(); }
 function undo() { const prev = undoStack.pop(); if (!prev) return; S = normalize(JSON.parse(prev)); commit(); hideToast(); }
 
@@ -1159,6 +1170,7 @@ const IC = {
   chev: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
 };
 function render() {
+  lazyRender = false;
   applyAuto();
   if (view.tab === 'report') $app.innerHTML = renderReport();
   else if (view.tab === 'dyn') $app.innerHTML = renderDynamics();
@@ -1634,14 +1646,14 @@ document.addEventListener('change', e => {
   if (t.dataset && t.dataset.pkey) {
     const v = parseFloat(String(t.value).replace(',', '.').replace(/[^0-9.]/g, ''));
     S.profile = { ...(S.profile || {}), [t.dataset.pkey]: isFinite(v) ? (t.dataset.pkey === 'weight' ? Math.round(v * 10) / 10 : t.dataset.pkey === 'act' ? v : Math.round(v)) : null };
-    commit(); return;
+    commitQuiet(); return;
   }
   if (t.dataset && t.dataset.tkey) {
     const v = parseInt(t.value, 10), key = t.dataset.tkey, i = +t.dataset.ti;
-    if (!isFinite(v) || v < 0) { render(); return; }
+    if (!isFinite(v) || v < 0) { lazyRender = true; return; } // вернём прежнее значение, когда закончите ввод
     manualEdit();
     const r = S.targets[key].slice(); r[i] = v; if (r[0] > r[1]) r.reverse();
-    S.targets[key] = r; commit();
+    S.targets[key] = r; commitQuiet();
   }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && sheetState) closeSheet(); });
