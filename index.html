@@ -332,6 +332,8 @@ body.sheet-open { overflow: hidden; }
 [hidden] { display: none !important; }
 /* «Цели»: о себе и расчёт */
 .prof { display: grid; gap: 12px; }
+.seg8 { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+.seg8 button { padding: 8px 0; font-variant-numeric: tabular-nums; }
 .warnline { margin: 6px 2px 0; color: var(--warn); }
 .weeknav { display: grid; grid-template-columns: 40px minmax(0, 1fr) 40px; align-items: center; gap: 4px; }
 .wl { display: grid; text-align: center; }
@@ -603,13 +605,17 @@ function rules() {
 }
 
 /* ---------- расчёт норм по формуле ---------- */
-const ACTS = [
-  [1.2, 'Почти без движения', 'сидячая работа, без тренировок'],
-  [1.375, 'Немного', '1–3 тренировки в неделю или много ходьбы'],
-  [1.55, 'Средне', '3–5 тренировок в неделю'],
-  [1.725, 'Много', '6–7 тренировок в неделю'],
-  [1.9, 'Очень много', 'физическая работа и тренировки'],
-];
+// активность = работа (база) + тренировки в неделю, по +0,06 за каждую:
+// сидячая + 3 тренировки = 1,38 (как классическая «лёгкая активность» 1,375)
+const WORKS = [['sit', 'Сидячая', 'офис, за рулём', 1.2], ['feet', 'На ногах', 'много хожу', 1.35], ['phys', 'Физическая', 'тяжёлый труд', 1.5]];
+const PER_WORKOUT = 0.06;
+function actOf(pr) {
+  // профили до этой версии: уровень активности одной кнопкой → работа + тренировки
+  const old = { 1.2: ['sit', 0], 1.375: ['sit', 3], 1.55: ['sit', 5], 1.725: ['sit', 7], 1.9: ['phys', 5] }[+pr.act] || ['sit', 3];
+  const work = WORKS.some(x => x[0] === pr.work) ? pr.work : old[0];
+  const n = pr.workouts != null && isFinite(+pr.workouts) ? Math.max(0, Math.min(7, +pr.workouts)) : old[1];
+  return { work, n, f: Math.round((WORKS.find(x => x[0] === work)[3] + PER_WORKOUT * n) * 1000) / 1000 };
+}
 const TRAINS = [['strength', 'Силовые', 'зал, веса'], ['fit', 'Фитнес', 'пилатес, кардио'], ['none', 'Нет', 'только шаги']];
 // белок, г на кг: силовые — больше, чтобы сохранить и растить мышцы; фитнес и кардио — меньше
 const PK = { strength: { loss: 1.8, keep: 1.6, gain: 1.8 }, fit: { loss: 1.5, keep: 1.3, gain: 1.6 }, none: { loss: 1.3, keep: 1.1, gain: 1.5 } };
@@ -621,7 +627,7 @@ function profileOk(pr) { return !!(pr && (pr.sex === 'm' || pr.sex === 'f') && p
 // Миффлин — Сан Жеор × активность ± темп; белок и жиры — на кг веса, углеводы — остаток калорий
 function calcTargets(pr) {
   const bmr = 10 * pr.weight + 6.25 * pr.height - 5 * pr.age + (pr.sex === 'f' ? -161 : 5);
-  const act = +pr.act || 1.375, tdee = bmr * act;
+  const A = actOf(pr), act = A.f, tdee = bmr * act;
   const goal = pr.goal || 'loss', pace = goal === 'keep' ? 0 : (+pr.pace || defPace(goal));
   const kRaw = tdee * (1 + (goal === 'gain' ? pace : -pace) / 100);
   const floorK = pr.sex === 'f' ? 1200 : 1500;
@@ -629,12 +635,12 @@ function calcTargets(pr) {
   // при сильном лишнем весе белок и жиры считаем от «поправленного» веса, а не от полного
   const h = pr.height / 100, bmi = pr.weight / (h * h), w25 = 25 * h * h;
   const refW = bmi > 30 ? w25 + 0.4 * (pr.weight - w25) : pr.weight;
-  const train = PK[pr.train] ? pr.train : 'strength';
+  const train = A.n === 0 ? 'none' : PK[pr.train] && pr.train !== 'none' ? pr.train : 'strength';
   const pk = PK[train][goal], p0 = Math.max(40, fl5(pk * refW - 5));
   const f = [fl5(0.7 * refW), ce5(0.85 * refW)], fMin = r5(0.6 * refW);
   const cMid = Math.max(60, (k - (p0 + 5) * 4 - (f[0] + f[1]) / 2 * 9) / 4);
   const c = [r5(cMid - 15), r5(cMid + 15)];
-  return { k, p: [p0, p0 + 10], f, c, fMin, x: { bmr, act, tdee, goal, pace, pk, train, refW, bmi, weekly: (k - tdee) * 7 / 7700, floorHit: k === floorK && kRaw < floorK } };
+  return { k, p: [p0, p0 + 10], f, c, fMin, x: { bmr, act, work: A.work, n: A.n, tdee, goal, pace, pk, train, refW, bmi, weekly: (k - tdee) * 7 / 7700, floorHit: k === floorK && kRaw < floorK } };
 }
 // нормы из формулы, если включён расчёт и «О себе» заполнено
 function applyAuto() {
@@ -1494,7 +1500,7 @@ function proteinForm() {
 
 function renderGoals() {
   const T = S.targets, pr = S.profile || {}, ok = profileOk(S.profile), C = ok ? calcTargets(S.profile) : null, x = C && C.x;
-  const goal = pr.goal || 'loss', pace = pr.pace || defPace(goal), act = +pr.act || 1.375;
+  const goal = pr.goal || 'loss', pace = pr.pace || defPace(goal), A = actOf(pr);
   const seg = (key, val, cur, label) => `<button type="button" data-act="prof" data-k="${key}" data-v="${val}" aria-selected="${String(cur) === String(val)}">${label}</button>`;
   const GOAL_TXT = { loss: 'цель — снижать вес', keep: 'цель — держать вес', gain: 'цель — набирать массу' };
   let h = `<h1 class="page-h">Цели на день</h1>
@@ -1508,8 +1514,9 @@ function renderGoals() {
         <label class="fld"><span>Рост, см</span><input id="pf-height" data-pkey="height" inputmode="numeric" autocomplete="off" value="${pr.height || ''}" placeholder="—"></label>
         <label class="fld"><span>Вес, кг</span><input id="pf-weight" data-pkey="weight" inputmode="decimal" autocomplete="off" value="${pr.weight ? String(pr.weight).replace('.', ',') : ''}" placeholder="—"></label>
       </div>
-      <div class="fld"><span>Активность</span><div class="acts">${ACTS.map(([v, n, d]) => `<button type="button" data-act="prof" data-k="act" data-v="${v}" aria-pressed="${act === v}"><b>${n}</b><small>${d}</small></button>`).join('')}</div></div>
-      <div class="fld"><span>Тренировки</span><div class="segs seg3 pace">${TRAINS.map(([v, n, d]) => seg('train', v, PK[pr.train] ? pr.train : 'strength', `${n}<small>${d}</small>`)).join('')}</div></div>
+      <div class="fld"><span>Работа</span><div class="segs seg3 pace">${WORKS.map(([v, n, d]) => seg('work', v, A.work, `${n}<small>${d}</small>`)).join('')}</div></div>
+      <div class="fld"><span>Тренировок в неделю</span><div class="segs seg8">${[0, 1, 2, 3, 4, 5, 6, 7].map(v => seg('workouts', v, A.n, v)).join('')}</div></div>
+      ${A.n > 0 ? `<div class="fld"><span>Какие тренировки</span><div class="segs pace">${TRAINS.filter(z => z[0] !== 'none').map(([v, n, d]) => seg('train', v, PK[pr.train] && pr.train !== 'none' ? pr.train : 'strength', `${n}<small>${d}</small>`)).join('')}</div></div>` : ''}
       <div class="fld"><span>Цель</span><div class="segs seg3">${GOALS.map(([v, n]) => seg('goal', v, goal, n)).join('')}</div></div>
       ${goal !== 'keep' ? `<div class="fld"><span>Темп — ${goal === 'loss' ? 'дефицит' : 'прибавка'} калорий</span><div class="segs seg${PACES[goal].length} pace">${PACES[goal].map(v => seg('pace', v, pace, `${goal === 'loss' ? '−' : '+'}${v}%<small>${PACE_N[goal][v]}</small>`)).join('')}</div>${goal === 'loss' && pace >= 25 ? '<p class="rule-hint warnline">Жёсткий дефицит тяжело держать: чаще срывы вечером и в выходные, и вес встаёт. Обычно лучше −15…20%.</p>' : ''}</div>` : ''}
       ${!ok && (pr.age || pr.height || pr.weight || pr.sex) ? `<p class="rule-hint">Для расчёта нужны пол, возраст (14–90), рост (120–230 см) и вес (35–250 кг).</p>` : ''}
@@ -1518,7 +1525,7 @@ function renderGoals() {
     const dec = v => String(v).replace('.', ',');
     h += `<div class="sec-h">Как посчитано</div><div class="card calc">
       <div class="crow"><span>Тратите в покое<small>формула Миффлина — Сан Жеора</small></span><b class="num">${f0(x.bmr)} ккал</b></div>
-      <div class="crow"><span>× активность ${dec(x.act)}<small>столько нужно, чтобы держать вес</small></span><b class="num">${f0(x.tdee)} ккал</b></div>
+      <div class="crow"><span>× активность ${dec(x.act)}<small>${WORKS.find(w => w[0] === x.work)[1].toLowerCase()} работа${x.n ? ` + ${x.n} ${plural(x.n, 'тренировка', 'тренировки', 'тренировок')} в неделю` : ', без тренировок'} — столько нужно, чтобы держать вес</small></span><b class="num">${f0(x.tdee)} ккал</b></div>
       ${x.goal !== 'keep' ? `<div class="crow"><span>${x.goal === 'loss' ? '−' : '+'}${x.pace}% — ${x.goal === 'loss' ? 'дефицит' : 'прибавка'}<small>${x.floorHit ? `ниже ${f0(C.k)} ккал не опускаем — темп будет меньше` : `≈ ${x.weekly > 0 ? '+' : '−'}${f1(Math.abs(x.weekly))} кг в неделю`}</small></span><b class="num">${f0(C.k)} ккал</b></div>` : ''}
       <div class="crow"><span>Белок<small>${dec(x.pk)} г на кг (${{ strength: 'силовые тренировки', fit: 'фитнес, пилатес', none: 'без тренировок' }[x.train]}) × ${f0(x.refW)} кг${x.bmi > 30 ? ' (вес с поправкой на лишний жир)' : ''}</small></span><b class="num">${C.p[0]}–${C.p[1]} г</b></div>
       <div class="crow"><span>Жиры<small>0,7–0,85 г на кг, не ниже ${C.fMin} г</small></span><b class="num">${C.f[0]}–${C.f[1]} г</b></div>
@@ -1627,7 +1634,7 @@ document.addEventListener('click', e => {
     case 'pdel': { const x = proteins().find(p => p.id === b.dataset.id); if (!x) break; pushUndo(); S.proteins = proteins().filter(p => p.id !== x.id); commit(); toast('Убрано: ' + x.n, true); break; }
     case 'preset': pushUndo(); S.proteins = null; commit(); toast('Стандартный список возвращён', true); break;
     case 'kcal': manualEdit(); S.targets.k = Math.max(1200, S.targets.k + +b.dataset.d); commit(); break;
-    case 'prof': { const k = b.dataset.k, v = k === 'pace' || k === 'act' ? +b.dataset.v : b.dataset.v; S.profile = { ...(S.profile || {}), [k]: v }; if (k === 'goal') S.profile.pace = defPace(v); commit(); break; }
+    case 'prof': { const k = b.dataset.k, v = k === 'pace' || k === 'act' || k === 'workouts' ? +b.dataset.v : b.dataset.v; S.profile = { ...(S.profile || {}), [k]: v }; if (k === 'goal') S.profile.pace = defPace(v); commit(); break; }
     case 'auto-on': pushUndo(); S.auto = true; commit(); toast('Нормы посчитаны по формуле', true); break;
     case 'close': closeSheet(); break;
     case 'undo': undo(); break;
