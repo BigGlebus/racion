@@ -332,6 +332,17 @@ body.sheet-open { overflow: hidden; }
 [hidden] { display: none !important; }
 /* «Цели»: о себе и расчёт */
 .prof { display: grid; gap: 12px; }
+.card > .goal.goalbtn { width: 100%; text-align: left; border-top: 1px solid var(--line); }
+.gl { display: grid; font-weight: 500; }
+.gl small { color: var(--muted); font-size: 12px; font-weight: 400; }
+.gv { display: flex; align-items: center; gap: 4px; padding: 8px 8px 8px 12px; border-radius: 10px; background: var(--surface-2); font-weight: 700; font-size: 16px; white-space: nowrap; }
+.gv svg { width: 16px; height: 16px; color: var(--muted); }
+.goalbtn:active .gv { background: var(--line); }
+.tsteps { display: grid; gap: 4px; margin: 6px 0 16px; }
+.tstep { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); font-weight: 600; }
+.tstep:first-child { border-top: 0; }
+.tstep .sbtn { width: 48px; height: 48px; font-size: 24px; }
+.tstep .stepper .v { min-width: 76px; font-size: 20px; }
 .seg8 { grid-template-columns: repeat(8, minmax(0, 1fr)); }
 .seg8 button { padding: 8px 0; font-variant-numeric: tabular-nums; }
 .warnline { margin: 6px 2px 0; color: var(--warn); }
@@ -1551,8 +1562,29 @@ function renderGoals() {
   return h;
 }
 function rangeRow(key, name, sub, [lo, hi]) {
-  return `<div class="goal"><label for="t-${key}-lo">${name}<small>${sub}</small></label>
-    <div class="range"><input id="t-${key}-lo" data-tkey="${key}" data-ti="0" inputmode="numeric" value="${lo}" aria-label="${name}, от"><span>–</span><input id="t-${key}-hi" data-tkey="${key}" data-ti="1" inputmode="numeric" value="${hi}" aria-label="${name}, до"></div></div>`;
+  return `<button type="button" class="goal goalbtn" data-act="tedit" data-k="${key}"><span class="gl">${name}<small>${sub}</small></span><span class="gv num">${lo}–${hi}${IC.right}</span></button>`;
+}
+// окно правки диапазона: «от» и «до» кнопками по 5 г, без клавиатуры
+function targetSheet(key) {
+  const NAMES = { p: 'Белок', f: 'Жиры', c: 'Углеводы' };
+  let [lo, hi] = S.targets[key];
+  hideToast(); // подсказка внизу не должна закрывать кнопки окна
+  openSheet({
+    draw(el) {
+      const row = (i, v) => `<div class="tstep"><span>${i ? 'до' : 'от'}</span><div class="stepper"><button class="sbtn" type="button" data-ts="${i}" data-d="-5" aria-label="Минус 5 г">−</button><span class="v num">${v} г</span><button class="sbtn" type="button" data-ts="${i}" data-d="5" aria-label="Плюс 5 г">+</button></div></div>`;
+      const paint = () => { el.innerHTML = `<div class="sw-head"><span class="eyebrow">Нормы на день</span><h3 class="sh-h">${NAMES[key]}</h3>${S.auto && profileOk(S.profile) ? '<p class="sh-sub">Поменяете — расчёт по формуле выключится.</p>' : ''}</div>
+        <div class="tsteps">${row(0, lo)}${row(1, hi)}</div>
+        <div class="sh-actions"><button class="ghost" type="button" data-act="close">Отмена</button><button class="primary" type="button" data-tsave="1">Сохранить</button></div>`; };
+      paint();
+      el.addEventListener('click', e => {
+        const b = e.target.closest('[data-ts], [data-tsave]'); if (!b) return;
+        if (b.dataset.tsave) { if (lo !== S.targets[key][0] || hi !== S.targets[key][1]) { manualEdit(); S.targets[key] = [lo, hi]; commit(); } closeSheet(); return; }
+        const d = +b.dataset.d;
+        if (b.dataset.ts === '0') lo = Math.max(0, Math.min(hi, lo + d)); else hi = Math.max(lo, hi + d);
+        paint();
+      });
+    },
+  });
 }
 
 /* ---------- загрузка отчёта ---------- */
@@ -1633,6 +1665,7 @@ document.addEventListener('click', e => {
     case 'padd': proteinForm(); break;
     case 'pdel': { const x = proteins().find(p => p.id === b.dataset.id); if (!x) break; pushUndo(); S.proteins = proteins().filter(p => p.id !== x.id); commit(); toast('Убрано: ' + x.n, true); break; }
     case 'preset': pushUndo(); S.proteins = null; commit(); toast('Стандартный список возвращён', true); break;
+    case 'tedit': targetSheet(b.dataset.k); break;
     case 'kcal': manualEdit(); S.targets.k = Math.max(1200, S.targets.k + +b.dataset.d); commit(); break;
     case 'prof': { const k = b.dataset.k, v = k === 'pace' || k === 'act' || k === 'workouts' ? +b.dataset.v : b.dataset.v; S.profile = { ...(S.profile || {}), [k]: v }; if (k === 'goal') S.profile.pace = defPace(v); commit(); break; }
     case 'auto-on': pushUndo(); S.auto = true; commit(); toast('Нормы посчитаны по формуле', true); break;
